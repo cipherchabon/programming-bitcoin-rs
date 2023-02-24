@@ -1,11 +1,13 @@
+/// A finite field.
 #[derive(Debug, PartialEq, Eq)]
 struct FiniteField {
     order: u32,
 }
 
 impl FiniteField {
-    // create a new finite field
-    // the order of the field must be a prime number
+    /// Create a new finite field.  
+    /// Arguments:
+    /// * `order`: the order of the field must be a prime number.
     fn new(order: u32) -> Self {
         if !is_prime(order) {
             panic!("The order of the field must be a prime number");
@@ -14,7 +16,12 @@ impl FiniteField {
     }
 }
 
-// check if the value is prime
+impl std::fmt::Display for FiniteField {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Finite field of order {}", self.order)
+    }
+}
+
 fn is_prime(num: u32) -> bool {
     if num == 2 {
         return true;
@@ -62,5 +69,35 @@ mod tests {
     #[should_panic]
     fn test_new_panic() {
         let _field = FiniteField::new(4);
+    }
+
+    #[test]
+    fn test_new_panic_message() {
+        let result = std::panic::catch_unwind(|| FiniteField::new(4));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().downcast_ref::<&str>(),
+            Some(&"The order of the field must be a prime number")
+        );
+    }
+
+    #[test]
+    fn test_eq() {
+        let field1 = FiniteField::new(2);
+        let field2 = FiniteField::new(2);
+        assert_eq!(field1, field2);
+    }
+
+    #[test]
+    fn test_ne() {
+        let field1 = FiniteField::new(2);
+        let field2 = FiniteField::new(3);
+        assert_ne!(field1, field2);
+    }
+
+    #[test]
+    fn test_display() {
+        let field = FiniteField::new(2);
+        assert_eq!(format!("{}", field), "Finite field of order 2");
     }
 }
