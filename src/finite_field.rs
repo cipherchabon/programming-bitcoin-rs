@@ -1,6 +1,6 @@
 /// A finite field.
-#[derive(Debug, PartialEq, Eq)]
-struct FiniteField {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct FiniteField {
     order: u32,
 }
 
@@ -8,11 +8,16 @@ impl FiniteField {
     /// Create a new finite field.  
     /// Arguments:
     /// * `order`: the order of the field must be a prime number.
-    fn new(order: u32) -> Self {
+    pub fn new(order: u32) -> Self {
         if !is_prime(order) {
             panic!("The order of the field must be a prime number");
         }
         Self { order }
+    }
+
+    /// Get the order of the field.
+    pub fn order(&self) -> u32 {
+        self.order
     }
 }
 
