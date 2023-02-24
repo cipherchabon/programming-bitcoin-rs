@@ -41,6 +41,24 @@ impl std::ops::Add for FFElement {
     }
 }
 
+impl std::ops::Sub for FFElement {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        if self.field != other.field {
+            panic!("Cannot subtract two numbers in different Fields");
+        }
+
+        // property of sums and differences in modular arithmetic
+        // (a - b) mod n = [(a mod n) - (b mod n)] mod n
+        let n = self.field.order();
+        let a = self.num.rem_euclid(n);
+        let b = other.num.rem_euclid(n);
+
+        Self::new((a + n - b).rem_euclid(n), self.field)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +99,18 @@ mod tests {
         let b = FFElement::new(21, field);
         let c = FFElement::new(7, field);
         assert_eq!(a + b == c, true);
+    }
+
+    #[test]
+    fn test_sub() {
+        let field = FiniteField::new(31);
+        let a = FFElement::new(29, field);
+        let b = FFElement::new(4, field);
+        let c = FFElement::new(25, field);
+        assert_eq!(a - b == c, true);
+        let a = FFElement::new(15, field);
+        let b = FFElement::new(30, field);
+        let c = FFElement::new(16, field);
+        assert_eq!(a - b == c, true);
     }
 }
