@@ -23,10 +23,7 @@ impl std::fmt::Display for FiniteField {
 }
 
 fn is_prime(num: u32) -> bool {
-    if num == 2 {
-        return true;
-    }
-    if num < 2 || num % 2 == 0 {
+    if num < 2 || (num > 2 && num % 2 == 0) {
         return false;
     }
     let mut i = 3;
