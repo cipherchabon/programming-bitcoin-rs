@@ -59,6 +59,44 @@ impl std::ops::Sub for FFElement {
     }
 }
 
+impl std::ops::Mul for FFElement {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        if self.field != other.field {
+            panic!("Cannot multiply two numbers in different Fields");
+        }
+
+        match self.num.checked_mul(other.num) {
+            Some(num) => {
+                let mod_prod = num.rem_euclid(self.field.order());
+                Self::new(mod_prod, self.field)
+            }
+            None => panic!("Overflow error"),
+        }
+    }
+}
+
+impl FFElement {
+    /// Computes the power of an element in a finite field
+    pub fn pow(self, exp: u32) -> Self {
+        // Raises self to the power of exp, using exponentiation by squaring.
+        let mut base = self;
+        let mut result = Self::new(1, self.field);
+        let mut exp = exp;
+
+        while exp > 0 {
+            if exp & 1 == 1 {
+                result = result * base;
+            }
+            exp >>= 1;
+            base = base * base;
+        }
+
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,5 +150,24 @@ mod tests {
         let b = FFElement::new(30, field);
         let c = FFElement::new(16, field);
         assert_eq!(a - b == c, true);
+    }
+
+    #[test]
+    fn test_mul() {
+        let field = FiniteField::new(31);
+        let a = FFElement::new(24, field);
+        let b = FFElement::new(19, field);
+        let c = FFElement::new(22, field);
+        assert_eq!(a * b == c, true);
+    }
+
+    #[test]
+    fn test_pow() {
+        let field = FiniteField::new(31);
+        let a = FFElement::new(17, field);
+        let b = FFElement::new(5, field);
+        let c = FFElement::new(18, field);
+        assert_eq!(a.pow(3) == FFElement::new(15, field), true);
+        assert_eq!(b.pow(5) * c == FFElement::new(16, field), true);
     }
 }
