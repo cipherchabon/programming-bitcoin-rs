@@ -23,6 +23,24 @@ impl std::fmt::Display for FFElement {
     }
 }
 
+impl std::ops::Add for FFElement {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        if self.field != other.field {
+            panic!("Cannot add two numbers in different Fields");
+        }
+
+        match self.num.checked_add(other.num) {
+            Some(num) => {
+                let mod_sum = num.rem_euclid(self.field.order());
+                Self::new(mod_sum, self.field)
+            }
+            None => panic!("Overflow error"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -50,5 +68,18 @@ mod tests {
         let field = FiniteField::new(13);
         let a = FFElement::new(7, field);
         assert_eq!(format!("{}", a), "FieldElement_13(7)");
+    }
+
+    #[test]
+    fn test_add() {
+        let field = FiniteField::new(31);
+        let a = FFElement::new(2, field);
+        let b = FFElement::new(15, field);
+        let c = FFElement::new(17, field);
+        assert_eq!(a + b == c, true);
+        let a = FFElement::new(17, field);
+        let b = FFElement::new(21, field);
+        let c = FFElement::new(7, field);
+        assert_eq!(a + b == c, true);
     }
 }
