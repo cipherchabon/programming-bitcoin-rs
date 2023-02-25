@@ -15,6 +15,13 @@ impl FFElement {
         }
         Self { num, field }
     }
+
+    pub fn pow(&self, exponent: u32) -> Self {
+        match self.num.checked_pow(exponent) {
+            Some(num) => Self::new(num.rem_euclid(self.field.order()), self.field),
+            None => panic!("Overflow error"),
+        }
+    }
 }
 
 impl std::fmt::Display for FFElement {
@@ -74,26 +81,6 @@ impl std::ops::Mul for FFElement {
             }
             None => panic!("Overflow error"),
         }
-    }
-}
-
-impl FFElement {
-    /// Computes the power of an element in a finite field
-    pub fn pow(self, exp: u32) -> Self {
-        // Raises self to the power of exp, using exponentiation by squaring.
-        let mut base = self;
-        let mut result = Self::new(1, self.field);
-        let mut exp = exp;
-
-        while exp > 0 {
-            if exp & 1 == 1 {
-                result = result * base;
-            }
-            exp >>= 1;
-            base = base * base;
-        }
-
-        result
     }
 }
 
