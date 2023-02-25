@@ -17,10 +17,10 @@ impl FFElement {
     }
 
     pub fn pow(&self, exponent: u32) -> Self {
-        match self.num.checked_pow(exponent) {
-            Some(num) => Self::new(num.rem_euclid(self.field.order()), self.field),
-            None => panic!("Overflow error"),
-        }
+        let p = self.field.order();
+        let exp = exponent.rem_euclid(p - 1);
+        let num = self.num.pow(exp).rem_euclid(p);
+        Self::new(num, self.field)
     }
 }
 
@@ -57,12 +57,12 @@ impl std::ops::Sub for FFElement {
         }
 
         // property of sums and differences in modular arithmetic
-        // (a - b) mod n = [(a mod n) - (b mod n)] mod n
-        let n = self.field.order();
-        let a = self.num.rem_euclid(n);
-        let b = other.num.rem_euclid(n);
+        // (a - b) mod p = [(a mod p) - (b mod p)] mod p
+        let p = self.field.order();
+        let a = self.num.rem_euclid(p);
+        let b = other.num.rem_euclid(p);
 
-        Self::new((a + n - b).rem_euclid(n), self.field)
+        Self::new((a + p - b).rem_euclid(p), self.field)
     }
 }
 
@@ -76,11 +76,45 @@ impl std::ops::Mul for FFElement {
 
         match self.num.checked_mul(other.num) {
             Some(num) => {
-                let mod_prod = num.rem_euclid(self.field.order());
+                let p = self.field.order();
+                let mod_prod = num.rem_euclid(p);
                 Self::new(mod_prod, self.field)
             }
             None => panic!("Overflow error"),
         }
+    }
+}
+
+impl std::ops::Div for FFElement {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        if self.field != other.field {
+            panic!("Cannot divide two numbers in different Fields");
+        }
+
+        // property of products and quotients in modular arithmetic
+        // (a / b) mod p = [(a mod p) * (b^-1 mod p)] mod p
+        let p = self.field.order();
+        let a = self.num.rem_euclid(p);
+        let b = other.num.rem_euclid(p);
+
+        // find the multiplicative inverse of b
+        let b_inv = match b {
+            0 => panic!("Cannot divide by zero"),
+            1 => 1,
+            _ => {
+                let mut x = 1;
+                while (b * x).rem_euclid(p) != 1 {
+                    x += 1;
+                }
+                x
+            }
+        };
+
+        let num = (a * b_inv).rem_euclid(p);
+
+        Self::new(num, self.field)
     }
 }
 
@@ -156,5 +190,13 @@ mod tests {
         let c = FFElement::new(18, field);
         assert_eq!(a.pow(3) == FFElement::new(15, field), true);
         assert_eq!(b.pow(5) * c == FFElement::new(16, field), true);
+    }
+
+    #[test]
+    fn test_div() {
+        let field = FiniteField::new(31);
+        let a = FFElement::new(3, field);
+        let b = FFElement::new(24, field);
+        assert_eq!(a / b == FFElement::new(4, field), true);
     }
 }
