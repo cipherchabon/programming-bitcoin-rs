@@ -1,5 +1,6 @@
 use crate::elliptic_curve::EllipticCurve;
 
+/// An elliptic curve point
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ECPoint {
     x: Option<i32>,
@@ -8,6 +9,14 @@ pub struct ECPoint {
 }
 
 impl ECPoint {
+    /// Creates a new point on the curve
+    ///
+    /// Arguments:
+    ///     x: x coordinate
+    ///     y: y coordinate
+    ///     curve: the curve the point is on
+    ///
+    /// Note: This function will panic if the point is not on the curve
     pub fn new(x: i32, y: i32, curve: EllipticCurve) -> Self {
         let a = curve.a();
         let b = curve.b();
@@ -26,6 +35,7 @@ impl ECPoint {
         }
     }
 
+    /// Returns the point at infinity
     pub fn infinity(curve: EllipticCurve) -> Self {
         Self {
             x: None,
@@ -34,20 +44,96 @@ impl ECPoint {
         }
     }
 
+    /// Returns true if the point is at infinity (additive identity)
     pub fn is_infinity(&self) -> bool {
+        // The x coordinate and y coordinate being None is how we signify the point at infinity.
         self.x.is_none() && self.y.is_none()
     }
 
-    pub fn x(&self) -> Option<i32> {
-        self.x
+    /// Returns the x coordinate of the point
+    pub fn x(&self) -> i32 {
+        if self.is_infinity() {
+            panic!("Point at infinity has no x coordinate");
+        }
+
+        self.x.unwrap()
     }
 
-    pub fn y(&self) -> Option<i32> {
-        self.y
+    /// Returns the y coordinate of the point
+    pub fn y(&self) -> i32 {
+        if self.is_infinity() {
+            panic!("Point at infinity has no y coordinate");
+        }
+
+        self.y.unwrap()
     }
 
     pub fn curve(&self) -> EllipticCurve {
         self.curve
+    }
+}
+
+impl std::ops::Add for ECPoint {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        if self.curve != other.curve {
+            panic!("Points {}, {} are not on the same curve", self, other);
+        }
+
+        // If either point is the point at infinity, we return the other point.
+        if self.is_infinity() {
+            return other;
+        } else if other.is_infinity() {
+            return self;
+        }
+
+        let x1 = self.x();
+        let y1 = self.y();
+        let x2 = other.x();
+        let y2 = other.y();
+
+        // When the two points are additive inverses
+        // (that is, they have the same x but a different y, causing a vertical line).
+        // This should return the point at infinity.
+        if x1 == x2 && y1 != y2 {
+            return Self::infinity(self.curve);
+        }
+
+        // When x1 != x2, we need to calculate the slope of the line between the two points.
+        // The slope is (y2 - y1) / (x2 - x1).
+        // Then we can calculate the x coordinate of the third point by squaring the slope and
+        // subtracting x1 and x2.
+        // The y coordinate of the third point is calculated by multiplying the slope by the
+        // difference between x1 and the new x coordinate, and then subtracting y1.
+        if x1 != x2 {
+            let slope = (y2 - y1) / (x2 - x1);
+            let x3 = slope.pow(2) - x1 - x2;
+            let y3 = slope * (x1 - x3) - y1;
+
+            return Self::new(x3, y3, self.curve);
+        }
+
+        // When x1 == x2 and y1 == y2, we need to calculate the slope of the tangent line.
+        // The slope is (3 * x1^2 + a) / (2 * y1).
+        // Then we can calculate the x coordinate of the third point by squaring the slope and
+        // subtracting 2 * x1.
+        // The y coordinate of the third point is calculated by multiplying the slope by the
+        // difference between x1 and the new x coordinate, and then subtracting y1.
+        if x1 == x2 && y1 == y2 {
+            if y1 == 0 {
+                // If y1 == 0, then the tangent line is vertical, and the third point is the point
+                return Self::infinity(self.curve);
+            }
+
+            let slope = (3 * x1.pow(2) + self.curve.a()) / (2 * y1);
+            let x3 = slope.pow(2) - 2 * x1;
+            let y3 = slope * (x1 - x3) - y1;
+
+            return Self::new(x3, y3, self.curve);
+        }
+
+        unreachable!();
     }
 }
 
@@ -118,6 +204,58 @@ mod tests {
             let b = ECPoint::new(18, 77, CURVE);
             assert_eq!(a != b, true);
             assert_eq!(a != a, false);
+        }
+    }
+
+    mod point_addition_tests {
+        use super::*;
+
+        #[test]
+        #[should_panic]
+        fn test_add_different_curves() {
+            let a = ECPoint::new(3, -7, CURVE);
+            let b = ECPoint::new(18, 77, EllipticCurve::new(1, 2));
+            let _ = a + b;
+        }
+
+        #[test]
+        fn test_add() {
+            let inf = ECPoint::infinity(CURVE);
+            let p1 = ECPoint::new(-1, -1, CURVE);
+            let p2 = ECPoint::new(-1, 1, CURVE);
+            assert_eq!(inf + p1, p1);
+            assert_eq!(p1 + inf, p1);
+            assert_eq!(p1 + p2, inf);
+        }
+
+        #[test]
+        fn test_add0() {
+            let a = ECPoint::infinity(CURVE);
+            let b = ECPoint::new(2, 5, CURVE);
+            let c = ECPoint::new(2, -5, CURVE);
+            assert_eq!(a + b, b);
+            assert_eq!(b + a, b);
+            assert_eq!(b + c, a);
+        }
+
+        #[test]
+        fn test_add1() {
+            let a = ECPoint::new(3, 7, CURVE);
+            let b = ECPoint::new(-1, -1, CURVE);
+            assert_eq!(a + b, ECPoint::new(2, -5, CURVE));
+        }
+
+        #[test]
+        fn test_add2() {
+            let a = ECPoint::new(-1, -1, CURVE);
+            assert_eq!(a + a, ECPoint::new(18, 77, CURVE));
+        }
+
+        #[test]
+        fn test_add3() {
+            let a = ECPoint::new(2, 5, CURVE);
+            let b = ECPoint::new(-1, -1, CURVE);
+            assert_eq!(a + b, ECPoint::new(3, -7, CURVE));
         }
     }
 }
