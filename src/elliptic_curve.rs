@@ -2,9 +2,9 @@
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EllipticCurve {
     /// The coefficient of the x term
-    a: u32,
+    a: i32,
     /// The constant term
-    b: u32,
+    b: i32,
 }
 
 impl EllipticCurve {
@@ -12,8 +12,16 @@ impl EllipticCurve {
     /// Arguments:
     /// * `a`: the coefficient of the x term
     /// * `b`: the constant term
-    pub fn new(a: u32, b: u32) -> Self {
+    pub const fn new(a: i32, b: i32) -> Self {
         Self { a, b }
+    }
+
+    pub fn a(&self) -> i32 {
+        self.a
+    }
+
+    pub fn b(&self) -> i32 {
+        self.b
     }
 }
 
