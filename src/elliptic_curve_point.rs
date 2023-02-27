@@ -3,8 +3,15 @@ use crate::elliptic_curve::EllipticCurve;
 /// An elliptic curve point
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ECPoint {
+    /// The x coordinate
+    /// None if the point is at infinity
     x: Option<i32>,
+
+    /// The y coordinate
+    /// None if the point is at infinity
     y: Option<i32>,
+
+    /// The curve the point is on
     curve: EllipticCurve,
 }
 
@@ -49,28 +56,6 @@ impl ECPoint {
         // The x coordinate and y coordinate being None is how we signify the point at infinity.
         self.x.is_none() && self.y.is_none()
     }
-
-    /// Returns the x coordinate of the point
-    pub fn x(&self) -> i32 {
-        if self.is_infinity() {
-            panic!("Point at infinity has no x coordinate");
-        }
-
-        self.x.unwrap()
-    }
-
-    /// Returns the y coordinate of the point
-    pub fn y(&self) -> i32 {
-        if self.is_infinity() {
-            panic!("Point at infinity has no y coordinate");
-        }
-
-        self.y.unwrap()
-    }
-
-    pub fn curve(&self) -> EllipticCurve {
-        self.curve
-    }
 }
 
 impl std::ops::Add for ECPoint {
@@ -88,10 +73,11 @@ impl std::ops::Add for ECPoint {
             return self;
         }
 
-        let x1 = self.x();
-        let y1 = self.y();
-        let x2 = other.x();
-        let y2 = other.y();
+        // We need to unwrap the x and y coordinates because we know they are not None.
+        let x1 = self.x.unwrap();
+        let y1 = self.y.unwrap();
+        let x2 = other.x.unwrap();
+        let y2 = other.y.unwrap();
 
         // When the two points are additive inverses
         // (that is, they have the same x but a different y, causing a vertical line).
