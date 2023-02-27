@@ -18,8 +18,8 @@ impl ECPoint {
     ///
     /// Note: This function will panic if the point is not on the curve
     pub fn new(x: i32, y: i32, curve: EllipticCurve) -> Self {
-        let a = curve.a();
-        let b = curve.b();
+        let a = curve.a;
+        let b = curve.b;
 
         let y2 = y.pow(2);
         let x3 = x.pow(3);
@@ -126,7 +126,7 @@ impl std::ops::Add for ECPoint {
                 return Self::infinity(self.curve);
             }
 
-            let slope = (3 * x1.pow(2) + self.curve.a()) / (2 * y1);
+            let slope = (3 * x1.pow(2) + self.curve.a) / (2 * y1);
             let x3 = slope.pow(2) - 2 * x1;
             let y3 = slope * (x1 - x3) - y1;
 
