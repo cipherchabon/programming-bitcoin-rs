@@ -10,14 +10,14 @@ pub struct FFElement {
 impl FFElement {
     pub fn new(num: u32, field: FiniteField) -> Self {
         // check that num is between 0 and order-1 inclusive
-        if num >= field.order() {
+        if num >= field.order {
             panic!("num must be between 0 and order-1 inclusive");
         }
         Self { num, field }
     }
 
     pub fn pow(&self, exponent: u32) -> Self {
-        let p = self.field.order();
+        let p = self.field.order;
         let exp = exponent.rem_euclid(p - 1);
         let num = self.num.pow(exp).rem_euclid(p);
         Self::new(num, self.field)
@@ -26,7 +26,7 @@ impl FFElement {
 
 impl std::fmt::Display for FFElement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "FieldElement_{}({})", self.field.order(), self.num)
+        write!(f, "FieldElement_{}({})", self.field.order, self.num)
     }
 }
 
@@ -40,7 +40,7 @@ impl std::ops::Add for FFElement {
 
         match self.num.checked_add(other.num) {
             Some(num) => {
-                let mod_sum = num.rem_euclid(self.field.order());
+                let mod_sum = num.rem_euclid(self.field.order);
                 Self::new(mod_sum, self.field)
             }
             None => panic!("Overflow error"),
@@ -58,7 +58,7 @@ impl std::ops::Sub for FFElement {
 
         // property of sums and differences in modular arithmetic
         // (a - b) mod p = [(a mod p) - (b mod p)] mod p
-        let p = self.field.order();
+        let p = self.field.order;
         let a = self.num.rem_euclid(p);
         let b = other.num.rem_euclid(p);
 
@@ -76,7 +76,7 @@ impl std::ops::Mul for FFElement {
 
         match self.num.checked_mul(other.num) {
             Some(num) => {
-                let p = self.field.order();
+                let p = self.field.order;
                 let mod_prod = num.rem_euclid(p);
                 Self::new(mod_prod, self.field)
             }
@@ -95,7 +95,7 @@ impl std::ops::Div for FFElement {
 
         // property of products and quotients in modular arithmetic
         // (a / b) mod p = [(a mod p) * (b^-1 mod p)] mod p
-        let p = self.field.order();
+        let p = self.field.order;
         let a = self.num.rem_euclid(p);
         let b = other.num.rem_euclid(p);
 
