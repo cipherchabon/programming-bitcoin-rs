@@ -128,7 +128,15 @@ impl std::fmt::Display for ECPoint {
         if self.is_infinity() {
             write!(f, "Point(infinity)")
         } else {
-            write!(f, "Point({}, {})", self.x.unwrap(), self.y.unwrap())
+            write!(
+                f,
+                "Point({}, {})_{}_{} FieldElement({})",
+                self.x.unwrap().num,
+                self.y.unwrap().num,
+                self.curve.a.num,
+                self.curve.b.num,
+                self.curve.a.field.order
+            )
         }
     }
 }
