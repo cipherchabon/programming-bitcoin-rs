@@ -85,6 +85,21 @@ impl std::ops::Mul for FFElement {
     }
 }
 
+impl std::ops::Mul<u32> for FFElement {
+    type Output = Self;
+
+    fn mul(self, other: u32) -> Self {
+        match self.num.checked_mul(other) {
+            Some(num) => {
+                let p = self.field.order;
+                let mod_prod = num.rem_euclid(p);
+                Self::new(mod_prod, self.field)
+            }
+            None => panic!("Overflow error"),
+        }
+    }
+}
+
 impl std::ops::Div for FFElement {
     type Output = Self;
 
@@ -180,6 +195,15 @@ mod tests {
         let b = FFElement::new(19, field);
         let c = FFElement::new(22, field);
         assert_eq!(a * b == c, true);
+    }
+
+    #[test]
+    fn test_rmul() {
+        let field = FiniteField::new(31);
+        let a = FFElement::new(24, field);
+        let b = FFElement::new(19, field);
+        let c = FFElement::new(22, field);
+        assert_eq!(b * a == c, true);
     }
 
     #[test]
