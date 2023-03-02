@@ -124,6 +124,37 @@ impl std::ops::Add for ECPoint {
     }
 }
 
+impl std::ops::Mul<u32> for ECPoint {
+    type Output = Self;
+
+    fn mul(self, coefficient: u32) -> Self {
+        let mut coef = coefficient;
+        // current represents the point that’s at the current bit. The first
+        // time through the loop it represents 1 × self; the second time it will
+        // be 2 × self, the third time 4 × self, then 8 × self, and so on. We
+        // double the point each time. In binary the coefficients are 1, 10,
+        // 100, 1000, 10000, etc.
+        let mut current = self;
+        // We start the result at 0, or the point at infinity.
+        let mut result = Self::infinity(self.curve);
+
+        while coef > 0 {
+            // We are looking at whether the rightmost bit is a 1. If it is,
+            // then we add the value of the current bit.
+            if coef & 1 == 1 {
+                result = result + current;
+            }
+            // We need to double the point until we’re past how big the
+            // coefficient can be.
+            current = current + current;
+            // We bit-shift the coefficient to the right.
+            coef >>= 1;
+        }
+
+        result
+    }
+}
+
 impl std::fmt::Display for ECPoint {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.is_infinity() {
@@ -201,6 +232,41 @@ mod tests {
             let p3 = ECPoint::new(x3, y3, curve).unwrap();
 
             assert_eq!(p1 + p2, p3);
+        }
+    }
+
+    #[test]
+    fn test_rmul() {
+        let order = 223;
+        let field = FiniteField::new(order);
+        let a = FFElement::new(0, field);
+        let b = FFElement::new(7, field);
+        let curve = EllipticCurve::new(a, b);
+
+        let multiplications = vec![
+            // (coefficient, x1, y1, x2, y2)
+            (2, 192, 105, 49, 71),
+            (2, 143, 98, 64, 168),
+            (2, 47, 71, 36, 111),
+            (4, 47, 71, 194, 51),
+            (8, 47, 71, 116, 55),
+            (21, 47, 71, 0, 0),
+        ];
+
+        for (s, x1_raw, y1_raw, x2_raw, y2_raw) in multiplications {
+            let x1 = FFElement::new(x1_raw, field);
+            let y1 = FFElement::new(y1_raw, field);
+            let p1 = ECPoint::new(x1, y1, curve).unwrap();
+
+            let p2 = if x2_raw == 0 && y2_raw == 0 {
+                ECPoint::infinity(curve)
+            } else {
+                let x2 = FFElement::new(x2_raw, field);
+                let y2 = FFElement::new(y2_raw, field);
+                ECPoint::new(x2, y2, curve).unwrap()
+            };
+
+            assert_eq!(p1 * s, p2);
         }
     }
 }
