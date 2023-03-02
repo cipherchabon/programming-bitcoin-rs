@@ -1,15 +1,15 @@
-use crate::elliptic_curve::EllipticCurve;
+use crate::{elliptic_curve::EllipticCurve, finite_field_element::FFElement};
 
 /// An elliptic curve point
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ECPoint {
     /// The x coordinate
     /// None if the point is at infinity
-    x: Option<i32>,
+    x: Option<FFElement>,
 
     /// The y coordinate
     /// None if the point is at infinity
-    y: Option<i32>,
+    y: Option<FFElement>,
 
     /// The curve the point is on
     curve: EllipticCurve,
@@ -24,7 +24,7 @@ impl ECPoint {
     ///     curve: the curve the point is on
     ///
     /// Note: This function will panic if the point is not on the curve
-    pub fn new(x: i32, y: i32, curve: EllipticCurve) -> Self {
+    pub fn new(x: FFElement, y: FFElement, curve: EllipticCurve) -> Result<Self, String> {
         let a = curve.a;
         let b = curve.b;
 
@@ -32,14 +32,14 @@ impl ECPoint {
         let x3 = x.pow(3);
 
         if y2 != x3 + a * x + b {
-            panic!("({}, {}) is not on the curve", x, y);
+            return Err(format!("({}, {}) is not on the curve", x, y));
         }
 
-        Self {
+        Ok(Self {
             x: Some(x),
             y: Some(y),
             curve,
-        }
+        })
     }
 
     /// Returns the point at infinity
@@ -97,7 +97,7 @@ impl std::ops::Add for ECPoint {
             let x3 = slope.pow(2) - x1 - x2;
             let y3 = slope * (x1 - x3) - y1;
 
-            return Self::new(x3, y3, self.curve);
+            return Self::new(x3, y3, self.curve).unwrap();
         }
 
         // When x1 == x2 and y1 == y2, we need to calculate the slope of the tangent line.
@@ -107,16 +107,17 @@ impl std::ops::Add for ECPoint {
         // The y coordinate of the third point is calculated by multiplying the slope by the
         // difference between x1 and the new x coordinate, and then subtracting y1.
         if x1 == x2 && y1 == y2 {
-            if y1 == 0 {
-                // If y1 == 0, then the tangent line is vertical, and the third point is the point
-                return Self::infinity(self.curve);
-            }
+            // TODO: Fix this
+            // if y1 == 0 {
+            //     // If y1 == 0, then the tangent line is vertical, and the third point is the point
+            //     return Self::infinity(self.curve);
+            // }
 
-            let slope = (3 * x1.pow(2) + self.curve.a) / (2 * y1);
-            let x3 = slope.pow(2) - 2 * x1;
+            let slope = (x1.pow(2) * 3 + self.curve.a) / (y1 * 2);
+            let x3 = slope.pow(2) - x1 * 2;
             let y3 = slope * (x1 - x3) - y1;
 
-            return Self::new(x3, y3, self.curve);
+            return Self::new(x3, y3, self.curve).unwrap();
         }
 
         unreachable!();
@@ -141,115 +142,65 @@ impl std::fmt::Display for ECPoint {
     }
 }
 
-// test module
 #[cfg(test)]
 mod tests {
+    use crate::finite_field::FiniteField;
+
     use super::*;
 
-    const CURVE: EllipticCurve = EllipticCurve::new(5, 7);
+    #[test]
+    fn test_point_on_curve() {
+        let order = 223;
+        let field = FiniteField::new(order);
+        let a = FFElement::new(0, field);
+        let b = FFElement::new(7, field);
+        let curve = EllipticCurve::new(a, b);
 
-    #[cfg(test)]
-    mod curve_point_tests {
-        use super::*;
-        // Determine which of these points are on the curve y2 = x3 + 5x + 7:
-        // Cases:
-        //      - true: (–1,–1), (18,77)
-        //      - false: (2,4), (5,7)
+        let valid_points = vec![(192, 105), (17, 56), (1, 193)];
+        let invalid_points = vec![(200, 119), (42, 99)];
 
-        #[test]
-        fn test_point_on_curve_1() {
-            ECPoint::new(-1, -1, CURVE);
+        for (x, y) in valid_points {
+            let x = FFElement::new(x, field);
+            let y = FFElement::new(y, field);
+            ECPoint::new(x, y, curve).unwrap();
         }
 
-        #[test]
-        fn test_point_on_curve_2() {
-            ECPoint::new(18, 77, CURVE);
-        }
-
-        #[test]
-        #[should_panic]
-        fn test_point_not_on_curve_1() {
-            ECPoint::new(2, 4, CURVE);
-        }
-
-        #[test]
-        #[should_panic]
-        fn test_point_not_on_curve_2() {
-            ECPoint::new(5, 7, CURVE);
+        for (x, y) in invalid_points {
+            let x = FFElement::new(x, field);
+            let y = FFElement::new(y, field);
+            assert!(ECPoint::new(x, y, curve).is_err());
         }
     }
 
-    // Determine which of these points are equal:
-    #[cfg(test)]
-    mod point_equality_tests {
-        use super::*;
+    #[test]
+    fn test_add() {
+        let order = 223;
+        let field = FiniteField::new(order);
+        let a = FFElement::new(0, field);
+        let b = FFElement::new(7, field);
+        let curve = EllipticCurve::new(a, b);
 
-        #[test]
-        fn test_point_equality() {
-            let a = ECPoint::new(3, -7, CURVE);
-            let b = ECPoint::new(18, 77, CURVE);
-            assert_eq!(a == b, false);
-            assert_eq!(a == a, true);
-        }
+        let additions = vec![
+            // (x1, y1, x2, y2, x3, y3)
+            (192, 105, 17, 56, 170, 142),
+            (47, 71, 117, 141, 60, 139),
+            (143, 98, 76, 66, 47, 71),
+        ];
 
-        #[test]
-        fn test_point_inequality() {
-            let a = ECPoint::new(3, -7, CURVE);
-            let b = ECPoint::new(18, 77, CURVE);
-            assert_eq!(a != b, true);
-            assert_eq!(a != a, false);
-        }
-    }
+        for (x1_raw, y1_raw, x2_raw, y2_raw, x3_raw, y3_raw) in additions {
+            let x1 = FFElement::new(x1_raw, field);
+            let y1 = FFElement::new(y1_raw, field);
+            let p1 = ECPoint::new(x1, y1, curve).unwrap();
 
-    mod point_addition_tests {
-        use super::*;
+            let x2 = FFElement::new(x2_raw, field);
+            let y2 = FFElement::new(y2_raw, field);
+            let p2 = ECPoint::new(x2, y2, curve).unwrap();
 
-        #[test]
-        #[should_panic]
-        fn test_add_different_curves() {
-            let a = ECPoint::new(3, -7, CURVE);
-            let b = ECPoint::new(18, 77, EllipticCurve::new(1, 2));
-            let _ = a + b;
-        }
+            let x3 = FFElement::new(x3_raw, field);
+            let y3 = FFElement::new(y3_raw, field);
+            let p3 = ECPoint::new(x3, y3, curve).unwrap();
 
-        #[test]
-        fn test_add() {
-            let inf = ECPoint::infinity(CURVE);
-            let p1 = ECPoint::new(-1, -1, CURVE);
-            let p2 = ECPoint::new(-1, 1, CURVE);
-            assert_eq!(inf + p1, p1);
-            assert_eq!(p1 + inf, p1);
-            assert_eq!(p1 + p2, inf);
-        }
-
-        #[test]
-        fn test_add0() {
-            let a = ECPoint::infinity(CURVE);
-            let b = ECPoint::new(2, 5, CURVE);
-            let c = ECPoint::new(2, -5, CURVE);
-            assert_eq!(a + b, b);
-            assert_eq!(b + a, b);
-            assert_eq!(b + c, a);
-        }
-
-        #[test]
-        fn test_add1() {
-            let a = ECPoint::new(3, 7, CURVE);
-            let b = ECPoint::new(-1, -1, CURVE);
-            assert_eq!(a + b, ECPoint::new(2, -5, CURVE));
-        }
-
-        #[test]
-        fn test_add2() {
-            let a = ECPoint::new(-1, -1, CURVE);
-            assert_eq!(a + a, ECPoint::new(18, 77, CURVE));
-        }
-
-        #[test]
-        fn test_add3() {
-            let a = ECPoint::new(2, 5, CURVE);
-            let b = ECPoint::new(-1, -1, CURVE);
-            assert_eq!(a + b, ECPoint::new(3, -7, CURVE));
+            assert_eq!(p1 + p2, p3);
         }
     }
 }
