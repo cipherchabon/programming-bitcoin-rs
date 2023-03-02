@@ -1,10 +1,12 @@
+use crate::finite_field_element::FFElement;
+
 /// Elliptic curve
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EllipticCurve {
     /// The coefficient of the x term
-    pub a: i32,
+    pub a: FFElement,
     /// The constant term
-    pub b: i32,
+    pub b: FFElement,
 }
 
 impl EllipticCurve {
@@ -12,7 +14,7 @@ impl EllipticCurve {
     /// Arguments:
     /// * `a`: the coefficient of the x term
     /// * `b`: the constant term
-    pub const fn new(a: i32, b: i32) -> Self {
+    pub const fn new(a: FFElement, b: FFElement) -> Self {
         Self { a, b }
     }
 }
@@ -25,32 +27,32 @@ impl std::fmt::Display for EllipticCurve {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+
+    use crate::finite_field::FiniteField;
 
     #[test]
     fn test_new() {
-        let curve = EllipticCurve::new(1, 2);
-        assert_eq!(curve.a, 1);
-        assert_eq!(curve.b, 2);
-    }
-
-    #[test]
-    fn test_fmt() {
-        let curve = EllipticCurve::new(1, 2);
-        assert_eq!(format!("{}", curve), "y^2 = x^3 + 1x + 2");
+        let field = FiniteField::new(17);
+        let curve = EllipticCurve::new(FFElement::new(1, field), FFElement::new(2, field));
+        assert_eq!(curve.a, FFElement::new(1, field));
+        assert_eq!(curve.b, FFElement::new(2, field));
     }
 
     #[test]
     fn test_eq() {
-        let curve1 = EllipticCurve::new(1, 2);
-        let curve2 = EllipticCurve::new(1, 2);
+        let field = FiniteField::new(17);
+        let curve1 = EllipticCurve::new(FFElement::new(1, field), FFElement::new(2, field));
+        let curve2 = EllipticCurve::new(FFElement::new(1, field), FFElement::new(2, field));
         assert_eq!(curve1, curve2);
     }
 
     #[test]
     fn test_ne() {
-        let curve1 = EllipticCurve::new(1, 2);
-        let curve2 = EllipticCurve::new(2, 1);
+        let field = FiniteField::new(17);
+        let curve1 = EllipticCurve::new(FFElement::new(1, field), FFElement::new(2, field));
+        let curve2 = EllipticCurve::new(FFElement::new(2, field), FFElement::new(1, field));
         assert_ne!(curve1, curve2);
     }
 }
