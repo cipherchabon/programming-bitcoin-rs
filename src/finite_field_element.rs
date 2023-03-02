@@ -3,8 +3,8 @@ use crate::finite_field::FiniteField;
 /// A finite field element.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FFElement {
-    num: u32,
-    field: FiniteField,
+    pub num: u32,
+    pub field: FiniteField,
 }
 
 impl FFElement {
