@@ -1,32 +1,45 @@
+use num::BigUint;
+
 use crate::finite_field::FiniteField;
 
 /// A finite field element.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FFElement {
-    pub num: u32,
-    pub field: FiniteField,
+    num: BigUint,
+    field: FiniteField,
 }
 
 impl FFElement {
-    pub fn new(num: u32, field: FiniteField) -> Self {
+    pub fn new(num: &BigUint, field: &FiniteField) -> Self {
         // check that num is between 0 and order-1 inclusive
-        if num >= field.order {
+        if num >= field.order() || num < &BigUint::from(0u32) {
             panic!("num must be between 0 and order-1 inclusive");
         }
-        Self { num, field }
+        Self {
+            num: num.clone(),
+            field: field.clone(),
+        }
     }
 
     pub fn pow(&self, exponent: u32) -> Self {
-        let p = self.field.order;
-        let exp = exponent.rem_euclid(p - 1);
-        let num = self.num.pow(exp).rem_euclid(p);
-        Self::new(num, self.field)
+        let p = self.field.order();
+        let exp = BigUint::from(exponent);
+        let num = self.num.modpow(&exp, &p);
+        Self::new(&num, &self.field)
+    }
+
+    pub fn num(&self) -> &BigUint {
+        &self.num
+    }
+
+    pub fn field(&self) -> &FiniteField {
+        &self.field
     }
 }
 
 impl std::fmt::Display for FFElement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "FieldElement_{}({})", self.field.order, self.num)
+        write!(f, "FieldElement_{}({})", self.field.order(), self.num)
     }
 }
 
@@ -38,13 +51,10 @@ impl std::ops::Add for FFElement {
             panic!("Cannot add two numbers in different Fields");
         }
 
-        match self.num.checked_add(other.num) {
-            Some(num) => {
-                let mod_sum = num.rem_euclid(self.field.order);
-                Self::new(mod_sum, self.field)
-            }
-            None => panic!("Overflow error"),
-        }
+        let s = self.num + other.num;
+        let mod_sum = s % self.field.order();
+
+        Self::new(&mod_sum, &self.field)
     }
 }
 
@@ -58,11 +68,11 @@ impl std::ops::Sub for FFElement {
 
         // property of sums and differences in modular arithmetic
         // (a - b) mod p = [(a mod p) - (b mod p)] mod p
-        let p = self.field.order;
-        let a = self.num.rem_euclid(p);
-        let b = other.num.rem_euclid(p);
+        let p = self.field.order();
+        let a = self.num % p;
+        let b = other.num % p;
 
-        Self::new((a + p - b).rem_euclid(p), self.field)
+        Self::new(&((a + p - b) % p), &self.field)
     }
 }
 
@@ -74,14 +84,10 @@ impl std::ops::Mul for FFElement {
             panic!("Cannot multiply two numbers in different Fields");
         }
 
-        match self.num.checked_mul(other.num) {
-            Some(num) => {
-                let p = self.field.order;
-                let mod_prod = num.rem_euclid(p);
-                Self::new(mod_prod, self.field)
-            }
-            None => panic!("Overflow error"),
-        }
+        let p = self.field.order();
+        let m = (self.num * other.num) % p;
+
+        Self::new(&m, &self.field)
     }
 }
 
@@ -89,14 +95,10 @@ impl std::ops::Mul<u32> for FFElement {
     type Output = Self;
 
     fn mul(self, other: u32) -> Self {
-        match self.num.checked_mul(other) {
-            Some(num) => {
-                let p = self.field.order;
-                let mod_prod = num.rem_euclid(p);
-                Self::new(mod_prod, self.field)
-            }
-            None => panic!("Overflow error"),
-        }
+        let p = self.field.order();
+        let m = (self.num * other) % p;
+
+        Self::new(&m, &self.field)
     }
 }
 
@@ -110,26 +112,15 @@ impl std::ops::Div for FFElement {
 
         // property of products and quotients in modular arithmetic
         // (a / b) mod p = [(a mod p) * (b^-1 mod p)] mod p
-        let p = self.field.order;
-        let a = self.num.rem_euclid(p);
-        let b = other.num.rem_euclid(p);
+        let p = self.field.order();
+        let a = self.num % p;
+        let b = other.num % p;
 
-        // find the multiplicative inverse of b
-        let b_inv = match b {
-            0 => panic!("Cannot divide by zero"),
-            1 => 1,
-            _ => {
-                let mut x = 1;
-                while (b * x).rem_euclid(p) != 1 {
-                    x += 1;
-                }
-                x
-            }
-        };
+        // b^-1
+        let two = BigUint::from(2u32);
+        let b_inv = b.modpow(&(p - two), &p);
 
-        let num = (a * b_inv).rem_euclid(p);
-
-        Self::new(num, self.field)
+        Self::new(&((a * b_inv) % p), &self.field)
     }
 }
 
@@ -139,88 +130,94 @@ mod tests {
 
     #[test]
     fn test_eq() {
-        let field = FiniteField::new(13);
-        let a = FFElement::new(7, field);
-        let b = FFElement::new(6, field);
+        let field = FiniteField::new(&BigUint::from(13u32));
+        let a = FFElement::new(&BigUint::from(7u32), &field);
+        let b = FFElement::new(&BigUint::from(6u32), &field);
         assert_eq!(a == b, false);
         assert_eq!(a == a, true);
     }
 
     #[test]
     fn test_ne() {
-        let field = FiniteField::new(13);
-        let a = FFElement::new(7, field);
-        let b = FFElement::new(6, field);
+        let field = FiniteField::new(&BigUint::from(13u32));
+        let a = FFElement::new(&BigUint::from(7u32), &field);
+        let b = FFElement::new(&BigUint::from(6u32), &field);
         assert_eq!(a != b, true);
         assert_eq!(a != a, false);
     }
 
     #[test]
     fn test_display() {
-        let field = FiniteField::new(13);
-        let a = FFElement::new(7, field);
+        let field = FiniteField::new(&BigUint::from(13u32));
+        let a = FFElement::new(&BigUint::from(7u32), &field);
         assert_eq!(format!("{}", a), "FieldElement_13(7)");
     }
 
     #[test]
     fn test_add() {
-        let field = FiniteField::new(31);
-        let a = FFElement::new(2, field);
-        let b = FFElement::new(15, field);
-        let c = FFElement::new(17, field);
+        let field = FiniteField::new(&BigUint::from(31u32));
+        let a = FFElement::new(&BigUint::from(2u32), &field);
+        let b = FFElement::new(&BigUint::from(15u32), &field);
+        let c = FFElement::new(&BigUint::from(17u32), &field);
         assert_eq!(a + b == c, true);
-        let a = FFElement::new(17, field);
-        let b = FFElement::new(21, field);
-        let c = FFElement::new(7, field);
+        let a = FFElement::new(&BigUint::from(17u32), &field);
+        let b = FFElement::new(&BigUint::from(21u32), &field);
+        let c = FFElement::new(&BigUint::from(7u32), &field);
         assert_eq!(a + b == c, true);
     }
 
     #[test]
     fn test_sub() {
-        let field = FiniteField::new(31);
-        let a = FFElement::new(29, field);
-        let b = FFElement::new(4, field);
-        let c = FFElement::new(25, field);
+        let field = FiniteField::new(&BigUint::from(31u32));
+        let a = FFElement::new(&BigUint::from(29u32), &field);
+        let b = FFElement::new(&BigUint::from(4u32), &field);
+        let c = FFElement::new(&BigUint::from(25u32), &field);
         assert_eq!(a - b == c, true);
-        let a = FFElement::new(15, field);
-        let b = FFElement::new(30, field);
-        let c = FFElement::new(16, field);
+        let a = FFElement::new(&BigUint::from(15u32), &field);
+        let b = FFElement::new(&BigUint::from(30u32), &field);
+        let c = FFElement::new(&BigUint::from(16u32), &field);
         assert_eq!(a - b == c, true);
     }
 
     #[test]
     fn test_mul() {
-        let field = FiniteField::new(31);
-        let a = FFElement::new(24, field);
-        let b = FFElement::new(19, field);
-        let c = FFElement::new(22, field);
+        let field = FiniteField::new(&BigUint::from(31u32));
+        let a = FFElement::new(&BigUint::from(24u32), &field);
+        let b = FFElement::new(&BigUint::from(19u32), &field);
+        let c = FFElement::new(&BigUint::from(22u32), &field);
         assert_eq!(a * b == c, true);
     }
 
     #[test]
     fn test_rmul() {
-        let field = FiniteField::new(31);
-        let a = FFElement::new(24, field);
-        let b = FFElement::new(19, field);
-        let c = FFElement::new(22, field);
+        let field = FiniteField::new(&BigUint::from(31u32));
+        let a = FFElement::new(&BigUint::from(24u32), &field);
+        let b = FFElement::new(&BigUint::from(19u32), &field);
+        let c = FFElement::new(&BigUint::from(22u32), &field);
         assert_eq!(b * a == c, true);
     }
 
     #[test]
     fn test_pow() {
-        let field = FiniteField::new(31);
-        let a = FFElement::new(17, field);
-        let b = FFElement::new(5, field);
-        let c = FFElement::new(18, field);
-        assert_eq!(a.pow(3) == FFElement::new(15, field), true);
-        assert_eq!(b.pow(5) * c == FFElement::new(16, field), true);
+        let field = FiniteField::new(&BigUint::from(31u32));
+        let a = FFElement::new(&BigUint::from(17u32), &field);
+        let b = FFElement::new(&BigUint::from(5u32), &field);
+        let c = FFElement::new(&BigUint::from(18u32), &field);
+        assert_eq!(
+            a.pow(3) == FFElement::new(&BigUint::from(15u32), &field),
+            true
+        );
+        assert_eq!(
+            b.pow(5) * c == FFElement::new(&BigUint::from(16u32), &field),
+            true
+        );
     }
 
     #[test]
     fn test_div() {
-        let field = FiniteField::new(31);
-        let a = FFElement::new(3, field);
-        let b = FFElement::new(24, field);
-        assert_eq!(a / b == FFElement::new(4, field), true);
+        let field = FiniteField::new(&BigUint::from(31u32));
+        let a = FFElement::new(&BigUint::from(3u32), &field);
+        let b = FFElement::new(&BigUint::from(24u32), &field);
+        assert_eq!(a / b == FFElement::new(&BigUint::from(4u32), &field), true);
     }
 }

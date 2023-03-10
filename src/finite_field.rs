@@ -1,18 +1,29 @@
+use num::BigUint;
+
+use crate::utils::biguint_primality_checker::biguint_primality_checker;
+
 /// A finite field.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FiniteField {
-    pub order: u32,
+    order: BigUint,
 }
 
 impl FiniteField {
     /// Create a new finite field.  
     /// Arguments:
     /// * `order`: the order of the field must be a prime number.
-    pub fn new(order: u32) -> Self {
-        if !is_prime(order) {
+    pub fn new(order: &BigUint) -> Self {
+        if !biguint_primality_checker(&order) {
             panic!("The order of the field must be a prime number");
         }
-        Self { order }
+        Self {
+            order: order.clone(),
+        }
+    }
+
+    /// Get the order of the field.
+    pub fn order(&self) -> &BigUint {
+        &self.order
     }
 }
 
@@ -22,55 +33,30 @@ impl std::fmt::Display for FiniteField {
     }
 }
 
-fn is_prime(num: u32) -> bool {
-    if num < 2 || (num > 2 && num % 2 == 0) {
-        return false;
-    }
-    let mut i = 3;
-    while i * i <= num {
-        if num % i == 0 {
-            return false;
-        }
-        i += 2;
-    }
-    true
-}
-
 #[cfg(test)]
 mod tests {
+    use num::FromPrimitive;
+
     use super::*;
 
     #[test]
-    fn test_is_prime() {
-        let values = vec![2, 11, 127, 10_453, 15_485_863];
-        for value in values {
-            assert_eq!(is_prime(value), true);
-        }
-    }
-
-    #[test]
-    fn test_is_not_prime() {
-        let values = vec![0, 1, 10, 378, 34_521, 98_765_432];
-        for value in values {
-            assert_eq!(is_prime(value), false);
-        }
-    }
-
-    #[test]
     fn test_new() {
-        let field = FiniteField::new(2);
-        assert_eq!(field.order, 2);
+        let two = BigUint::from_u32(2).unwrap();
+        let field = FiniteField::new(&two.clone());
+        assert_eq!(field.order, two.clone());
     }
 
     #[test]
     #[should_panic]
     fn test_new_panic() {
-        let _field = FiniteField::new(4);
+        let four = BigUint::from_u32(4).unwrap();
+        let _field = FiniteField::new(&four);
     }
 
     #[test]
     fn test_new_panic_message() {
-        let result = std::panic::catch_unwind(|| FiniteField::new(4));
+        let four = BigUint::from_u32(4).unwrap();
+        let result = std::panic::catch_unwind(|| FiniteField::new(&four));
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().downcast_ref::<&str>(),
@@ -80,21 +66,25 @@ mod tests {
 
     #[test]
     fn test_eq() {
-        let field1 = FiniteField::new(2);
-        let field2 = FiniteField::new(2);
+        let two = BigUint::from_u32(2).unwrap();
+        let field1 = FiniteField::new(&two.clone());
+        let field2 = FiniteField::new(&two.clone());
         assert_eq!(field1, field2);
     }
 
     #[test]
     fn test_ne() {
-        let field1 = FiniteField::new(2);
-        let field2 = FiniteField::new(3);
+        let two = BigUint::from_u32(2).unwrap();
+        let three = BigUint::from_u32(3).unwrap();
+        let field1 = FiniteField::new(&two);
+        let field2 = FiniteField::new(&three);
         assert_ne!(field1, field2);
     }
 
     #[test]
     fn test_display() {
-        let field = FiniteField::new(2);
+        let two = BigUint::from_u32(2).unwrap();
+        let field = FiniteField::new(&two);
         assert_eq!(format!("{}", field), "Finite field of order 2");
     }
 }
