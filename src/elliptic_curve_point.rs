@@ -1,3 +1,5 @@
+use num::BigUint;
+
 use crate::{elliptic_curve::EllipticCurve, finite_field_element::FFElement};
 
 /// An elliptic curve point
@@ -172,6 +174,37 @@ impl std::ops::Mul<u32> for ECPoint {
     }
 }
 
+impl std::ops::Mul<BigUint> for ECPoint {
+    type Output = Self;
+
+    fn mul(self, coefficient: BigUint) -> Self {
+        let mut coef = coefficient;
+        // current represents the point that’s at the current bit. The first
+        // time through the loop it represents 1 × self; the second time it will
+        // be 2 × self, the third time 4 × self, then 8 × self, and so on. We
+        // double the point each time. In binary the coefficients are 1, 10,
+        // 100, 1000, 10000, etc.
+        let mut current = self.clone();
+        // We start the result at 0, or the point at infinity.
+        let mut result = Self::infinity(&self.curve);
+
+        while coef > BigUint::from(0u32) {
+            // We are looking at whether the rightmost bit is a 1. If it is,
+            // then we add the value of the current bit.
+            if coef.clone() & BigUint::from(1u32) == BigUint::from(1u32) {
+                result = result + current.clone();
+            }
+            // We need to double the point until we’re past how big the
+            // coefficient can be.
+            current = current.clone() + current.clone();
+            // We bit-shift the coefficient to the right.
+            coef >>= 1;
+        }
+
+        result
+    }
+}
+
 impl std::fmt::Display for ECPoint {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.is_infinity() {
@@ -267,6 +300,40 @@ mod tests {
             (4, 47, 71, 194, 51),
             (8, 47, 71, 116, 55),
             (21, 47, 71, 0, 0),
+        ];
+
+        for (s, x1_raw, y1_raw, x2_raw, y2_raw) in multiplications {
+            let x1 = FFElement::new(&BigUint::from(x1_raw), &field);
+            let y1 = FFElement::new(&BigUint::from(y1_raw), &field);
+            let p1 = ECPoint::new(&x1, &y1, &curve).unwrap();
+
+            let p2 = if x2_raw == 0 && y2_raw == 0 {
+                ECPoint::infinity(&curve)
+            } else {
+                let x2 = FFElement::new(&BigUint::from(x2_raw), &field);
+                let y2 = FFElement::new(&BigUint::from(y2_raw), &field);
+                ECPoint::new(&x2, &y2, &curve).unwrap()
+            };
+
+            assert_eq!(p1 * s, p2);
+        }
+    }
+
+    #[test]
+    fn test_rmul_biguint() {
+        let field = FiniteField::new(&BigUint::from(223_u32));
+        let a = FFElement::new(&BigUint::from(0u32), &field);
+        let b = FFElement::new(&BigUint::from(7u32), &field);
+        let curve = EllipticCurve::new(a, b);
+
+        let multiplications: Vec<(BigUint, u32, u32, u32, u32)> = vec![
+            // (coefficient, x1, y1, x2, y2)
+            (BigUint::from(2u32), 192, 105, 49, 71),
+            (BigUint::from(2u32), 143, 98, 64, 168),
+            (BigUint::from(2u32), 47, 71, 36, 111),
+            (BigUint::from(4u32), 47, 71, 194, 51),
+            (BigUint::from(8u32), 47, 71, 116, 55),
+            (BigUint::from(21u32), 47, 71, 0, 0),
         ];
 
         for (s, x1_raw, y1_raw, x2_raw, y2_raw) in multiplications {
