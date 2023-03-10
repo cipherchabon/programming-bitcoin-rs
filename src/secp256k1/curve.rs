@@ -31,8 +31,12 @@ impl Secp256k1 {
         Self { curve }
     }
 
-    pub fn curve(&self) -> &EllipticCurve {
-        &self.curve
+    pub fn a(&self) -> &FFElement {
+        self.curve.a()
+    }
+
+    pub fn b(&self) -> &FFElement {
+        self.curve.b()
     }
 }
 
@@ -68,7 +72,7 @@ mod tests {
         assert_eq!(secp256k1.curve.a().num(), &BigUint::from(A));
         assert_eq!(secp256k1.curve.b().num(), &BigUint::from(B));
         assert_eq!(
-            secp256k1.curve.a().field().order(),
+            secp256k1.a().field().order(),
             &BigUint::from_str_radix(P, 16).unwrap()
         );
     }
