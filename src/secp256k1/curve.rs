@@ -1,6 +1,8 @@
 use num::{BigUint, Num};
 
-use crate::elliptic_curve::{curve::EllipticCurve, element::FFElement, finite_field::FiniteField};
+use crate::elliptic_curve::{
+    curve::EllipticCurve, element::FFElement, finite_field::FiniteField, point::ECPoint,
+};
 
 // Recommended 256-bit Elliptic Curve Domain Parameters
 const A: u32 = 0;
@@ -22,6 +24,7 @@ pub struct Secp256k1 {
 }
 
 impl Secp256k1 {
+    /// Create a new secp256k1 elliptic curve.
     pub fn new() -> Self {
         let order = BigUint::from_str_radix(P, 16).unwrap();
         let field = FiniteField::new(&order);
@@ -31,32 +34,32 @@ impl Secp256k1 {
 
         Self { curve }
     }
+
+    pub fn infinity(&self) -> ECPoint {
+        ECPoint::infinity(&self.curve)
+    }
+
+    pub fn g(&self) -> ECPoint {
+        let field = self.curve.a().field();
+        let x = FFElement::new(&BigUint::from_str_radix(Gx, 16).unwrap(), &field);
+        let y = FFElement::new(&BigUint::from_str_radix(Gy, 16).unwrap(), &field);
+
+        ECPoint::new(&x, &y, &self.curve).unwrap()
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::elliptic_curve::point::ECPoint;
-
     use super::*;
 
     #[test]
     fn test_secp256k1_parameters() {
-        let order = BigUint::from_str_radix(P, 16).unwrap();
-        let field = FiniteField::new(&order);
-
-        let x = FFElement::new(&BigUint::from_str_radix(Gx, 16).unwrap(), &field);
-        let y = FFElement::new(&BigUint::from_str_radix(Gy, 16).unwrap(), &field);
-
-        let zero = FFElement::new(&BigUint::from(0u32), &field);
-        let seven = FFElement::new(&BigUint::from(7u32), &field);
-        let curve = EllipticCurve::new(zero, seven);
-
-        let g = ECPoint::new(&x, &y, &curve).unwrap();
+        let curve = Secp256k1::new();
 
         let n = BigUint::from_str_radix(N, 16).unwrap();
 
-        assert_eq!(g * n, ECPoint::infinity(&curve));
+        assert_eq!(curve.g() * n, curve.infinity());
     }
 
     #[test]
