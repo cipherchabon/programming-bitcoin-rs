@@ -1,6 +1,6 @@
 use num::BigUint;
 
-use crate::{elliptic_curve::EllipticCurve, finite_field_element::FFElement};
+use super::{curve::EllipticCurve, element::FFElement};
 
 /// An elliptic curve point
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -227,7 +227,7 @@ impl std::fmt::Display for ECPoint {
 mod tests {
     use num::BigUint;
 
-    use crate::finite_field::FiniteField;
+    use crate::elliptic_curve::finite_field::FiniteField;
 
     use super::*;
 

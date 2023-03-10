@@ -1,6 +1,6 @@
 use num::BigUint;
 
-use crate::finite_field::FiniteField;
+use super::finite_field::FiniteField;
 
 /// A finite field element.
 #[derive(Debug, PartialEq, Eq, Clone)]
