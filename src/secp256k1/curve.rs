@@ -2,7 +2,7 @@ use num::{BigUint, Num};
 
 use crate::elliptic_curve::{curve::EllipticCurve, element::FFElement, finite_field::FiniteField};
 
-// secp256k1 elliptic curve parameters
+// Recommended 256-bit Elliptic Curve Domain Parameters
 const A: u32 = 0;
 const B: u32 = 7;
 
@@ -15,6 +15,7 @@ const N: &str = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd036414
 const Gx: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 const Gy: &str = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
 
+/// Standard secp256k1 elliptic curve
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Secp256k1 {
     curve: EllipticCurve,
@@ -29,14 +30,6 @@ impl Secp256k1 {
         let curve = EllipticCurve::new(a, b);
 
         Self { curve }
-    }
-
-    pub fn a(&self) -> &FFElement {
-        self.curve.a()
-    }
-
-    pub fn b(&self) -> &FFElement {
-        self.curve.b()
     }
 }
 
@@ -72,7 +65,7 @@ mod tests {
         assert_eq!(secp256k1.curve.a().num(), &BigUint::from(A));
         assert_eq!(secp256k1.curve.b().num(), &BigUint::from(B));
         assert_eq!(
-            secp256k1.a().field().order(),
+            secp256k1.curve.a().field().order(),
             &BigUint::from_str_radix(P, 16).unwrap()
         );
     }
