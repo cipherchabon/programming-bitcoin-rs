@@ -19,9 +19,7 @@ const Gy: &str = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4
 
 /// Standard secp256k1 elliptic curve
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Secp256k1 {
-    curve: EllipticCurve,
-}
+pub struct Secp256k1(EllipticCurve);
 
 impl Secp256k1 {
     /// Create a new secp256k1 elliptic curve.
@@ -32,19 +30,23 @@ impl Secp256k1 {
         let b = FFElement::new(&BigUint::from(B), &field);
         let curve = EllipticCurve::new(a, b);
 
-        Self { curve }
+        Self(curve)
     }
 
     pub fn infinity(&self) -> ECPoint {
-        ECPoint::infinity(&self.curve)
+        ECPoint::infinity(&self.0)
     }
 
     pub fn g(&self) -> ECPoint {
-        let field = self.curve.a().field();
+        let field = self.0.a().field();
         let x = FFElement::new(&BigUint::from_str_radix(Gx, 16).unwrap(), &field);
         let y = FFElement::new(&BigUint::from_str_radix(Gy, 16).unwrap(), &field);
 
-        ECPoint::new(&x, &y, &self.curve).unwrap()
+        ECPoint::new(&x, &y, &self.0).unwrap()
+    }
+
+    pub fn curve(&self) -> &EllipticCurve {
+        &self.0
     }
 }
 
@@ -65,10 +67,10 @@ mod tests {
     #[test]
     fn test_secp256k1() {
         let secp256k1 = Secp256k1::new();
-        assert_eq!(secp256k1.curve.a().num(), &BigUint::from(A));
-        assert_eq!(secp256k1.curve.b().num(), &BigUint::from(B));
+        assert_eq!(secp256k1.curve().a().num(), &BigUint::from(A));
+        assert_eq!(secp256k1.curve().b().num(), &BigUint::from(B));
         assert_eq!(
-            secp256k1.curve.a().field().order(),
+            secp256k1.curve().a().field().order(),
             &BigUint::from_str_radix(P, 16).unwrap()
         );
     }
