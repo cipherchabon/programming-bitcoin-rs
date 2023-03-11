@@ -1,6 +1,12 @@
-use num::BigUint;
+use num::{BigUint, Num};
 
 use super::{curve::EllipticCurve, element::FFElement};
+
+// G = (Gx, Gy)
+const Gx: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const Gy: &str = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+
+const N: &str = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
 
 /// An elliptic curve point
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -44,13 +50,27 @@ impl ECPoint {
         })
     }
 
+    pub fn new_secp256k1(x: &FFElement, y: &FFElement) -> Result<Self, String> {
+        Self::new(x, y, &EllipticCurve::new_secp256k1())
+    }
+
+    pub fn new_secp256k1_g() -> Self {
+        let x = FFElement::new_secp256k1(&BigUint::from_str_radix(Gx, 16).unwrap());
+        let y = FFElement::new_secp256k1(&BigUint::from_str_radix(Gy, 16).unwrap());
+        Self::new_secp256k1(&x, &y).unwrap()
+    }
+
     /// Returns the point at infinity
-    pub fn infinity(curve: &EllipticCurve) -> Self {
+    pub fn new_infinity(curve: &EllipticCurve) -> Self {
         Self {
             x: None,
             y: None,
             curve: curve.clone(),
         }
+    }
+
+    pub fn new_secp256k1_infinity() -> Self {
+        Self::new_infinity(&EllipticCurve::new_secp256k1())
     }
 
     /// Returns true if the point is at infinity (additive identity)
@@ -97,7 +117,7 @@ impl std::ops::Add for ECPoint {
         // (that is, they have the same x but a different y, causing a vertical line).
         // This should return the point at infinity.
         if x1 == x2 && y1 != y2 {
-            return Self::infinity(&self.curve);
+            return Self::new_infinity(&self.curve);
         }
 
         // When x1 != x2, we need to calculate the slope of the line between the two points.
@@ -155,7 +175,7 @@ impl std::ops::Mul<u32> for ECPoint {
         // 100, 1000, 10000, etc.
         let mut current = self.clone();
         // We start the result at 0, or the point at infinity.
-        let mut result = Self::infinity(&self.curve);
+        let mut result = Self::new_infinity(&self.curve);
 
         while coef > 0 {
             // We are looking at whether the rightmost bit is a 1. If it is,
@@ -186,7 +206,7 @@ impl std::ops::Mul<BigUint> for ECPoint {
         // 100, 1000, 10000, etc.
         let mut current = self.clone();
         // We start the result at 0, or the point at infinity.
-        let mut result = Self::infinity(&self.curve);
+        let mut result = Self::new_infinity(&self.curve);
 
         while coef > BigUint::from(0u32) {
             // We are looking at whether the rightmost bit is a 1. If it is,
@@ -308,7 +328,7 @@ mod tests {
             let p1 = ECPoint::new(&x1, &y1, &curve).unwrap();
 
             let p2 = if x2_raw == 0 && y2_raw == 0 {
-                ECPoint::infinity(&curve)
+                ECPoint::new_infinity(&curve)
             } else {
                 let x2 = FFElement::new(&BigUint::from(x2_raw), &field);
                 let y2 = FFElement::new(&BigUint::from(y2_raw), &field);
@@ -342,7 +362,7 @@ mod tests {
             let p1 = ECPoint::new(&x1, &y1, &curve).unwrap();
 
             let p2 = if x2_raw == 0 && y2_raw == 0 {
-                ECPoint::infinity(&curve)
+                ECPoint::new_infinity(&curve)
             } else {
                 let x2 = FFElement::new(&BigUint::from(x2_raw), &field);
                 let y2 = FFElement::new(&BigUint::from(y2_raw), &field);
@@ -351,5 +371,15 @@ mod tests {
 
             assert_eq!(p1 * s, p2);
         }
+    }
+
+    #[test]
+    fn test_secp256k1_parameters() {
+        let n = BigUint::from_str_radix(N, 16).unwrap();
+
+        assert_eq!(
+            ECPoint::new_secp256k1_g() * n,
+            ECPoint::new_secp256k1_infinity()
+        );
     }
 }

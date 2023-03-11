@@ -1,6 +1,9 @@
-use num::BigUint;
+use num::{BigUint, Num};
 
 use crate::utils::biguint_primality_checker::biguint_primality_checker;
+
+// Finite field prime order
+const P: &str = "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f";
 
 /// A finite field.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -19,6 +22,11 @@ impl FiniteField {
         Self {
             order: order.clone(),
         }
+    }
+
+    pub fn new_secp256k1() -> Self {
+        let order = BigUint::from_str_radix(P, 16).unwrap();
+        Self::new(&order)
     }
 
     /// Get the order of the field.

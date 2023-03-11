@@ -1,4 +1,10 @@
+use num::BigUint;
+
 use super::element::FFElement;
+
+// Recommended 256-bit Elliptic Curve Domain Parameters
+const A: u32 = 0;
+const B: u32 = 7;
 
 /// Elliptic curve
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -16,6 +22,12 @@ impl EllipticCurve {
     /// * `b`: the constant term
     pub const fn new(a: FFElement, b: FFElement) -> Self {
         Self { a, b }
+    }
+
+    pub fn new_secp256k1() -> Self {
+        let a = FFElement::new_secp256k1(&BigUint::from(A));
+        let b = FFElement::new_secp256k1(&BigUint::from(B));
+        Self::new(a, b)
     }
 
     pub fn a(&self) -> &FFElement {

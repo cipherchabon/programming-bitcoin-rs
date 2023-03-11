@@ -21,6 +21,13 @@ impl FFElement {
         }
     }
 
+    pub fn new_secp256k1(num: &BigUint) -> Self {
+        Self {
+            num: num.clone(),
+            field: FiniteField::new_secp256k1(),
+        }
+    }
+
     pub fn pow(&self, exponent: u32) -> Self {
         let p = self.field.order();
         let exp = BigUint::from(exponent);
