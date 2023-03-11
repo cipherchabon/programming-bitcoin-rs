@@ -23,6 +23,7 @@ pub struct ECPoint {
     curve: EllipticCurve,
 }
 
+/// Constructors
 impl ECPoint {
     /// Creates a new point on the curve
     ///
@@ -50,16 +51,43 @@ impl ECPoint {
         })
     }
 
+    /// Returns the point at infinity
+    pub fn new_infinity(curve: &EllipticCurve) -> Self {
+        Self {
+            x: None,
+            y: None,
+            curve: curve.clone(),
+        }
+    }
+
+    /// Creates a new point on the secp256k1 curve
     pub fn new_secp256k1(x: &FFElement, y: &FFElement) -> Result<Self, String> {
         Self::new(x, y, &EllipticCurve::new_secp256k1())
     }
 
+    /// Get the generator point on the secp256k1 curve
     pub fn new_secp256k1_g() -> Self {
         let x = FFElement::new_secp256k1(&BigUint::from_str_radix(GX, 16).unwrap());
         let y = FFElement::new_secp256k1(&BigUint::from_str_radix(GY, 16).unwrap());
         Self::new_secp256k1(&x, &y).unwrap()
     }
 
+    /// Get the point at infinity on the secp256k1 curve
+    pub fn new_secp256k1_infinity() -> Self {
+        Self::new_infinity(&EllipticCurve::new_secp256k1())
+    }
+}
+
+/// Methods
+impl ECPoint {
+    /// Verifies if a digital signature is valid for a given message.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The public key to verify the signature against.
+    /// * `z` - The hash of the message that was signed.
+    /// * `signature` - The digital signature to verify.
+    ///
     pub fn verify(&self, z: &BigUint, signature: &Signature) -> bool {
         // By Fermat's Little Theorem, 1/s = pow(s, N-2, N)
         let n = &BigUint::from_str_radix(N, 16).unwrap();
@@ -78,38 +106,13 @@ impl ECPoint {
         let p = self.clone();
         let total = g * u + p * v;
 
-        total.x().unwrap().num() == signature.r()
-    }
-
-    /// Returns the point at infinity
-    pub fn new_infinity(curve: &EllipticCurve) -> Self {
-        Self {
-            x: None,
-            y: None,
-            curve: curve.clone(),
-        }
-    }
-
-    pub fn new_secp256k1_infinity() -> Self {
-        Self::new_infinity(&EllipticCurve::new_secp256k1())
+        total.x.unwrap().num() == signature.r()
     }
 
     /// Returns true if the point is at infinity (additive identity)
     pub fn is_infinity(&self) -> bool {
         // The x coordinate and y coordinate being None is how we signify the point at infinity.
         self.x.is_none() && self.y.is_none()
-    }
-
-    pub fn x(&self) -> Option<&FFElement> {
-        self.x.as_ref()
-    }
-
-    pub fn y(&self) -> Option<&FFElement> {
-        self.y.as_ref()
-    }
-
-    pub fn curve(&self) -> &EllipticCurve {
-        &self.curve
     }
 }
 
@@ -251,14 +254,15 @@ impl std::fmt::Display for ECPoint {
         if self.is_infinity() {
             write!(f, "Point(infinity)")
         } else {
+            let p = self.clone();
             write!(
                 f,
                 "Point({}, {})_{}_{} FieldElement({})",
-                self.x().unwrap().num(),
-                self.y().unwrap().num(),
-                self.curve.a().num(),
-                self.curve.b().num(),
-                self.curve.a().field().order()
+                p.x.unwrap(),
+                p.y.unwrap(),
+                p.curve.a(),
+                p.curve.b(),
+                p.curve.a().field().order(),
             )
         }
     }
