@@ -9,8 +9,11 @@ pub struct Signature {
 }
 
 impl Signature {
-    pub fn new(r: BigUint, s: BigUint) -> Self {
-        Self { r, s }
+    pub fn new(r: &BigUint, s: &BigUint) -> Self {
+        Self {
+            r: r.clone(),
+            s: s.clone(),
+        }
     }
 
     pub fn r(&self) -> &BigUint {

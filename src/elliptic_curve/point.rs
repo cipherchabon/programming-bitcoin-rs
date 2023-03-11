@@ -1,10 +1,10 @@
 use num::{BigUint, Num};
 
-use super::{curve::EllipticCurve, element::FFElement};
+use super::{curve::EllipticCurve, element::FFElement, signature::Signature};
 
 // G = (Gx, Gy)
-const Gx: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
-const Gy: &str = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+const GX: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const GY: &str = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
 
 const N: &str = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
 
@@ -55,9 +55,30 @@ impl ECPoint {
     }
 
     pub fn new_secp256k1_g() -> Self {
-        let x = FFElement::new_secp256k1(&BigUint::from_str_radix(Gx, 16).unwrap());
-        let y = FFElement::new_secp256k1(&BigUint::from_str_radix(Gy, 16).unwrap());
+        let x = FFElement::new_secp256k1(&BigUint::from_str_radix(GX, 16).unwrap());
+        let y = FFElement::new_secp256k1(&BigUint::from_str_radix(GY, 16).unwrap());
         Self::new_secp256k1(&x, &y).unwrap()
+    }
+
+    pub fn verify(&self, z: &BigUint, signature: &Signature) -> bool {
+        // By Fermat's Little Theorem, 1/s = pow(s, N-2, N)
+        let n = &BigUint::from_str_radix(N, 16).unwrap();
+        let s = signature.s();
+        let two = &BigUint::from(2u8);
+        let s_inv = s.modpow(&(n - two), &n);
+
+        // u = z / s
+        let u = z * &s_inv % n;
+
+        // v = r / s
+        let v = signature.r() * &s_inv % n;
+
+        // u*G + v*P should have as the x coordinate, r
+        let g = Self::new_secp256k1_g();
+        let p = self.clone();
+        let total = g * u + p * v;
+
+        total.x().unwrap().num() == signature.r()
     }
 
     /// Returns the point at infinity
@@ -381,5 +402,65 @@ mod tests {
             ECPoint::new_secp256k1_g() * n,
             ECPoint::new_secp256k1_infinity()
         );
+    }
+
+    #[test]
+    fn test_verify() {
+        let x = FFElement::new_secp256k1(
+            &BigUint::from_str_radix(
+                "887387e452b8eacc4acfde10d9aaf7f6d9a0f975aabb10d006e4da568744d06c",
+                16,
+            )
+            .unwrap(),
+        );
+        let y = FFElement::new_secp256k1(
+            &BigUint::from_str_radix(
+                "61de6d95231cd89026e286df3b6ae4a894a3378e393e93a0f45b666329a0ae34",
+                16,
+            )
+            .unwrap(),
+        );
+
+        let point = ECPoint::new_secp256k1(&x, &y).unwrap();
+
+        let z = BigUint::from_str_radix(
+            "ec208baa0fc1c19f708a9ca96fdeff3ac3f230bb4a7ba4aede4942ad003c0f60",
+            16,
+        )
+        .unwrap();
+
+        let r = BigUint::from_str_radix(
+            "ac8d1c87e51d0d441be8b3dd5b05c8795b48875dffe00b7ffcfac23010d3a395",
+            16,
+        )
+        .unwrap();
+
+        let s = BigUint::from_str_radix(
+            "68342ceff8935ededd102dd876ffd6ba72d6a427a3edb13d26eb0781cb423c4",
+            16,
+        )
+        .unwrap();
+
+        assert!(point.verify(&z, &Signature::new(&r, &s)));
+
+        let z = BigUint::from_str_radix(
+            "7c076ff316692a3d7eb3c3bb0f8b1488cf72e1afcd929e29307032997a838a3d",
+            16,
+        )
+        .unwrap();
+
+        let r = BigUint::from_str_radix(
+            "eff69ef2b1bd93a66ed5219add4fb51e11a840f404876325a1e8ffe0529a2c",
+            16,
+        )
+        .unwrap();
+
+        let s = BigUint::from_str_radix(
+            "c7207fee197d27c618aea621406f6bf5ef6fca38681d82b2f06fddbdce6feab6",
+            16,
+        )
+        .unwrap();
+
+        assert!(point.verify(&z, &Signature::new(&r, &s)));
     }
 }
