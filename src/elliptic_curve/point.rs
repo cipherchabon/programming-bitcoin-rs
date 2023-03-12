@@ -104,6 +104,11 @@ impl ECPoint {
         // The x coordinate and y coordinate being None is how we signify the point at infinity.
         self.x.is_none() && self.y.is_none()
     }
+
+    /// Returns the x coordinate of the point
+    pub(super) fn x(&self) -> Option<FFElement> {
+        self.x.clone()
+    }
 }
 
 impl std::ops::Add for ECPoint {
