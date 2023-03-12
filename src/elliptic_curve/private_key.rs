@@ -1,3 +1,4 @@
+use hmac::Hmac;
 use num::BigUint;
 use num_bigint::RandBigInt;
 use rand;
@@ -32,6 +33,8 @@ impl PrivateKey {
         let g = Secp256k1Params::g();
 
         // chooses a random integer from [0,n)
+        // TODO: Use deterministic k generation instead of random.
+        // See the RFC6979 standard.
         let mut rng = rand::thread_rng();
         let k = rng.gen_biguint_below(&n);
 
