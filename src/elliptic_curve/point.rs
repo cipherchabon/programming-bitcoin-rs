@@ -1,12 +1,9 @@
-use num::{BigUint, Num};
+use num::BigUint;
 
-use super::{curve::EllipticCurve, element::FFElement, signature::Signature};
-
-// G = (Gx, Gy)
-const GX: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
-const GY: &str = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
-
-const N: &str = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
+use super::{
+    curve::EllipticCurve, element::FFElement, secp256k1_params::Secp256k1Params,
+    signature::Signature,
+};
 
 /// An elliptic curve point
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -65,13 +62,6 @@ impl ECPoint {
         Self::new(x, y, &EllipticCurve::new_secp256k1())
     }
 
-    /// Get the generator point on the secp256k1 curve
-    pub fn new_secp256k1_g() -> Self {
-        let x = FFElement::new_secp256k1(&BigUint::from_str_radix(GX, 16).unwrap());
-        let y = FFElement::new_secp256k1(&BigUint::from_str_radix(GY, 16).unwrap());
-        Self::new_secp256k1(&x, &y).unwrap()
-    }
-
     /// Get the point at infinity on the secp256k1 curve
     pub fn new_secp256k1_infinity() -> Self {
         Self::new_infinity(&EllipticCurve::new_secp256k1())
@@ -90,7 +80,7 @@ impl ECPoint {
     ///
     pub fn verify(&self, z: &BigUint, signature: &Signature) -> bool {
         // By Fermat's Little Theorem, 1/s = pow(s, N-2, N)
-        let n = &BigUint::from_str_radix(N, 16).unwrap();
+        let n = &Secp256k1Params::n();
         let s = signature.s();
         let two = &BigUint::from(2u8);
         let s_inv = s.modpow(&(n - two), &n);
@@ -102,7 +92,7 @@ impl ECPoint {
         let v = signature.r() * &s_inv % n;
 
         // u*G + v*P should have as the x coordinate, r
-        let g = Self::new_secp256k1_g();
+        let g = Secp256k1Params::g();
         let p = self.clone();
         let total = g * u + p * v;
 
@@ -270,7 +260,7 @@ impl std::fmt::Display for ECPoint {
 
 #[cfg(test)]
 mod tests {
-    use num::BigUint;
+    use num::{BigUint, Num};
 
     use crate::elliptic_curve::finite_field::FiniteField;
 
@@ -400,10 +390,8 @@ mod tests {
 
     #[test]
     fn test_secp256k1_parameters() {
-        let n = BigUint::from_str_radix(N, 16).unwrap();
-
         assert_eq!(
-            ECPoint::new_secp256k1_g() * n,
+            Secp256k1Params::g() * Secp256k1Params::n(),
             ECPoint::new_secp256k1_infinity()
         );
     }
