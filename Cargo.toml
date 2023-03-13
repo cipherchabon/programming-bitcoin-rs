@@ -12,3 +12,5 @@ name = "programming_bitcoin"
 num-bigint = { version ="0.4.3", features = ["rand"] }
 rand = "0.8.5"
 num = "0.4.0"
+sha2 = "0.10.6"
+rfc6979 = "0.4.0"

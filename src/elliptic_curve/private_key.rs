@@ -1,7 +1,8 @@
-use hmac::Hmac;
 use num::BigUint;
 use num_bigint::RandBigInt;
 use rand;
+use rfc6979::consts::U32;
+use sha2::{digest::generic_array::GenericArray, Digest, Sha256};
 
 use super::{secp256k1_params::Secp256k1Params, signature::Signature};
 
@@ -32,11 +33,7 @@ impl PrivateKey {
         let n = Secp256k1Params::n();
         let g = Secp256k1Params::g();
 
-        // chooses a random integer from [0,n)
-        // TODO: Use deterministic k generation instead of random.
-        // See the RFC6979 standard.
-        let mut rng = rand::thread_rng();
-        let k = rng.gen_biguint_below(&n);
+        let k = self.deterministic_k(message);
 
         // r is the x coordinate of k*G
         let x = (g * k.clone()).x().unwrap();
@@ -55,6 +52,27 @@ impl PrivateKey {
         }
 
         Signature::new(&r, &s)
+    }
+
+    // see https://docs.rs/rfc6979/0.4.0/rfc6979/
+    fn deterministic_k(&self, z: &BigUint) -> BigUint {
+        let p_bytes = Secp256k1Params::n().to_bytes_be();
+        let mut p = GenericArray::<u8, U32>::default();
+        p.copy_from_slice(p_bytes.as_slice());
+
+        let k_bytes = self.secret.to_bytes_be();
+        let mut k = GenericArray::<u8, U32>::default();
+        k.copy_from_slice(&k_bytes);
+
+        let z_bytes = z.to_bytes_be();
+        let mut z = GenericArray::<u8, U32>::default();
+        z.copy_from_slice(&z_bytes);
+
+        let h = Sha256::digest(&z);
+
+        let k = rfc6979::generate_k::<Sha256, U32>(&k.into(), &p.into(), &h, b"");
+
+        BigUint::from_bytes_be(&k)
     }
 }
 
