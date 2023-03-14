@@ -35,6 +35,13 @@ impl FFElement {
         Self::new(&num, &self.field)
     }
 
+    pub fn sqrt(&self) -> Self {
+        let p = self.field.order();
+        let exp = (p + BigUint::from(1u32)) / BigUint::from(4u32);
+        let num = self.num.modpow(&exp, &p);
+        Self::new(&num, &self.field)
+    }
+
     pub fn num(&self) -> &BigUint {
         &self.num
     }

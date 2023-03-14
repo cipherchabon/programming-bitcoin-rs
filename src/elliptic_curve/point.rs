@@ -134,6 +134,56 @@ impl ECPoint {
         sec.extend(self.x().unwrap().num().to_bytes_be());
         sec
     }
+
+    /// Deserialize a point from SEC format
+    pub fn parse(sec_bin: &[u8]) -> Result<Self, String> {
+        // The uncompressed SEC format is pretty straightforward.
+        if sec_bin.len() == 65 {
+            if sec_bin[0] != 4 {
+                return Err("Invalid SEC format".to_string());
+            }
+
+            let x = BigUint::from_bytes_be(&sec_bin[1..33]);
+            let y = BigUint::from_bytes_be(&sec_bin[33..65]);
+            return Self::new_secp256k1(
+                &FFElement::new_secp256k1(&x),
+                &FFElement::new_secp256k1(&y),
+            );
+        }
+
+        if sec_bin.len() == 33 {
+            // The evenness of the y coordinate is given in the first byte.
+            let is_even = sec_bin[0] == 2;
+            let x = BigUint::from_bytes_be(&sec_bin[1..]);
+            let x = FFElement::new_secp256k1(&x);
+
+            // right side of the equation y^2 = x^3 + 7
+            let alpha = x.pow(3) + FFElement::new_secp256k1(&Secp256k1Params::b());
+
+            // solve for left side
+            let beta = alpha.sqrt();
+
+            let even_beta = if beta.num().is_even() {
+                beta.clone()
+            } else {
+                FFElement::new_secp256k1(&(Secp256k1Params::p() - beta.clone().num()))
+            };
+
+            let odd_beta = if beta.num().is_even() {
+                FFElement::new_secp256k1(&(Secp256k1Params::p() - beta.num()))
+            } else {
+                beta
+            };
+
+            if is_even {
+                return Self::new_secp256k1(&x, &even_beta);
+            } else {
+                return Self::new_secp256k1(&x, &odd_beta);
+            }
+        }
+
+        Err("Invalid SEC format".to_string())
+    }
 }
 
 impl std::ops::Add for ECPoint {
@@ -540,5 +590,25 @@ mod tests {
             hex::decode("0296be5b1292f6c856b3c5654e886fc13511462059089cdf9c479623bfcbe77690")
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn test_parse_uncompressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5000u32);
+        assert_eq!(ECPoint::parse(&point.to_uncompressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from(2018_u32).pow(5);
+        assert_eq!(ECPoint::parse(&point.to_uncompressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef12345", 16).unwrap();
+        assert_eq!(ECPoint::parse(&point.to_uncompressed_sec()).unwrap(), point);
+    }
+
+    #[test]
+    fn test_parse_compressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5001u32);
+        assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from(2019_u32).pow(5);
+        assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef54321", 16).unwrap();
+        assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
     }
 }
