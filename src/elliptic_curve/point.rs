@@ -1,4 +1,4 @@
-use num::BigUint;
+use num::{BigUint, Integer};
 
 use super::{
     curve::EllipticCurve, element::FFElement, secp256k1_params::Secp256k1Params,
@@ -106,8 +106,26 @@ impl ECPoint {
     }
 
     /// Returns the x coordinate of the point
+    /// Note: This will panic if the point is at infinity
     pub(super) fn x(&self) -> Option<FFElement> {
         self.x.clone()
+    }
+
+    /// Returns the y coordinate of the point
+    /// Note: This will panic if the point is at infinity
+    pub(super) fn y(&self) -> Option<FFElement> {
+        self.y.clone()
+    }
+}
+
+impl ECPoint {
+    /// Uncompressed SEC format
+    pub fn to_uncompressed_sec(&self) -> Vec<u8> {
+        // return b'\x04' + self.x.num.to_bytes(32, 'big') + self.y.num.to_bytes(32, 'big')
+        let mut sec = vec![4u8];
+        sec.extend(self.x().unwrap().num().to_bytes_be());
+        sec.extend(self.y().unwrap().num().to_bytes_be());
+        sec
     }
 }
 
@@ -459,5 +477,39 @@ mod tests {
         .unwrap();
 
         assert!(point.verify(&z, &Signature::new(&r, &s)));
+    }
+
+    #[test]
+    fn test_uncompressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5000u32);
+        assert_eq!(
+            point.to_uncompressed_sec(),
+            hex::decode(
+                "04\
+                ffe558e388852f0120e46af2d1b370f85854a8eb0841811ece0e3e03d282d57c315dc72890a4\
+                f10a1481c031b03b351b0dc79901ca18a00cf009dbdb157a1d10"
+            )
+            .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from(2018_u32).pow(5);
+        assert_eq!(
+            point.to_uncompressed_sec(),
+            hex::decode(
+                "04\
+                027f3da1918455e03c46f659266a1bb5204e959db7364d2f473bdf8f0a13cc9dff87647fd023\
+                c13b4a4994f17691895806e1b40b57f4fd22581a4f46851f3b06"
+            )
+            .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef12345", 16).unwrap();
+        assert_eq!(
+            point.to_uncompressed_sec(),
+            hex::decode(
+                "04\
+                d90cd625ee87dd38656dd95cf79f65f60f7273b67d3096e68bd81e4f5342691f842efa762fd5\
+                9961d0e99803c61edba8b3e3f7dc3a341836f97733aebf987121"
+            )
+            .unwrap()
+        );
     }
 }
