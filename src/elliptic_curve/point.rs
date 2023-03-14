@@ -121,10 +121,17 @@ impl ECPoint {
 impl ECPoint {
     /// Uncompressed SEC format
     pub fn to_uncompressed_sec(&self) -> Vec<u8> {
-        // return b'\x04' + self.x.num.to_bytes(32, 'big') + self.y.num.to_bytes(32, 'big')
         let mut sec = vec![4u8];
         sec.extend(self.x().unwrap().num().to_bytes_be());
         sec.extend(self.y().unwrap().num().to_bytes_be());
+        sec
+    }
+
+    /// Compressed SEC format
+    pub fn to_compressed_sec(&self) -> Vec<u8> {
+        let y_is_even = self.y().unwrap().num().is_even();
+        let mut sec = vec![if y_is_even { 2u8 } else { 3u8 }];
+        sec.extend(self.x().unwrap().num().to_bytes_be());
         sec
     }
 }
@@ -510,6 +517,28 @@ mod tests {
                 9961d0e99803c61edba8b3e3f7dc3a341836f97733aebf987121"
             )
             .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_compressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5001u32);
+        assert_eq!(
+            point.to_compressed_sec(),
+            hex::decode("0357a4f368868a8a6d572991e484e664810ff14c05c0fa023275251151fe0e53d1")
+                .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from(2019_u32).pow(5);
+        assert_eq!(
+            point.to_compressed_sec(),
+            hex::decode("02933ec2d2b111b92737ec12f1c5d20f3233a0ad21cd8b36d0bca7a0cfa5cb8701")
+                .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef54321", 16).unwrap();
+        assert_eq!(
+            point.to_compressed_sec(),
+            hex::decode("0296be5b1292f6c856b3c5654e886fc13511462059089cdf9c479623bfcbe77690")
+                .unwrap()
         );
     }
 }
