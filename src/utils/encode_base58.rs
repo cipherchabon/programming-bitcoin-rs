@@ -1,5 +1,7 @@
 use num::{BigUint, Integer, ToPrimitive, Zero};
 
+use super::hash256::hash256;
+
 const BASE58_ALPHABET: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 pub fn encode_base58(bytes: &[u8]) -> String {
@@ -32,9 +34,16 @@ pub fn encode_base58(bytes: &[u8]) -> String {
     result.chars().rev().collect()
 }
 
+/// Encode bytes with a checksum
+pub fn encode_base58_checksum(bytes: &[u8]) -> String {
+    let mut result = bytes.to_vec();
+    let hash = hash256(bytes);
+    result.extend_from_slice(&hash[0..4]);
+    encode_base58(&result)
+}
+
 #[cfg(test)]
 mod tests {
-    use num::Num;
 
     use super::*;
 
@@ -56,9 +65,20 @@ mod tests {
         ];
 
         for (value, expected) in values {
-            let value = BigUint::from_str_radix(value, 16).unwrap().to_bytes_be();
+            let value: Vec<u8> = hex::decode(value).unwrap();
             let result = encode_base58(&value);
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn test_encode_base58_checksum() {
+        let value = "7c076ff316692a3d7eb3c3bb0f8b1488cf72e1afcd929e29307032997a838a3d";
+        let value: Vec<u8> = hex::decode(value).unwrap();
+
+        assert_eq!(
+            encode_base58_checksum(&value),
+            "wdA2ffYs5cudrdkhFm5Ym94AuLvavacapuDBL2CAcvqYPkcvi"
+        );
     }
 }
