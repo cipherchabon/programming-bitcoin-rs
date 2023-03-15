@@ -1,5 +1,7 @@
 use num::{BigUint, Integer};
 
+use crate::utils::{encode_base58::encode_base58_checksum, hash160::hash160};
+
 use super::{
     curve::EllipticCurve, element::FFElement, secp256k1_params::Secp256k1Params,
     signature::Signature,
@@ -97,6 +99,24 @@ impl ECPoint {
         let total = g * u + p * v;
 
         total.x.unwrap().num() == signature.r()
+    }
+
+    /// Returns the address of the public key
+    pub fn get_address(&self, compressed: bool, testnet: bool) -> String {
+        let sec = if compressed {
+            self.to_compressed_sec()
+        } else {
+            self.to_uncompressed_sec()
+        };
+
+        let h160 = hash160(&sec);
+
+        let prefix = if testnet { b"\x6f" } else { b"\x00" };
+
+        let mut address = prefix.to_vec();
+        address.extend(h160);
+
+        encode_base58_checksum(&address)
     }
 
     /// Returns true if the point is at infinity (additive identity)
@@ -610,5 +630,48 @@ mod tests {
         assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
         let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef54321", 16).unwrap();
         assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
+    }
+
+    #[test]
+    fn test_address_exercise_5() {
+        let point = Secp256k1Params::g() * BigUint::from(5002u32);
+
+        assert_eq!(
+            point.get_address(false, true),
+            "mmTPbXQFxboEtNRkwfh6K51jvdtHLxGeMA"
+        );
+
+        let point = Secp256k1Params::g() * BigUint::from(2020_u32).pow(5);
+        assert_eq!(
+            point.get_address(true, true),
+            "mopVkxp8UhXqRYbCYJsbeE1h1fiF64jcoH"
+        );
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("12345deadbeef", 16).unwrap();
+        assert_eq!(
+            point.get_address(true, false),
+            "1F1Pn2y6pDb68E5nYJJeba4TLg2U7B6KF1"
+        );
+    }
+
+    #[test]
+    fn test_address() {
+        let secret1 = 888_u32.pow(3);
+        let secret2 = 321_u32;
+        let secret3 = 4242424242_u32;
+
+        let values = vec![
+            // secret, compressed, testnet, address
+            (secret1, true, false, "148dY81A9BmdpMhvYEVznrM45kWN32vSCN"),
+            (secret1, true, true, "mieaqB68xDCtbUBYFoUNcmZNwk74xcBfTP"),
+            (secret2, false, false, "1S6g2xBJSED7Qr9CYZib5f4PYVhHZiVfj"),
+            (secret2, false, true, "mfx3y63A7TfTtXKkv7Y6QzsPFY6QCBCXiP"),
+            (secret3, false, false, "1226JSptcStqn4Yq9aAmNXdwdc2ixuH9nb"),
+            (secret3, false, true, "mgY3bVusRUL6ZB2Ss999CSrGVbdRwVpM8s"),
+        ];
+
+        for (secret, compressed, testnet, address) in values {
+            let point = Secp256k1Params::g() * BigUint::from(secret);
+            assert_eq!(point.get_address(compressed, testnet), address);
+        }
     }
 }
