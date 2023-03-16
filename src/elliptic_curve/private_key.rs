@@ -1,8 +1,9 @@
 use num::BigUint;
-use num_bigint::RandBigInt;
-use rand;
+
 use rfc6979::consts::U32;
 use sha2::{digest::generic_array::GenericArray, Digest, Sha256};
+
+use crate::utils::encode_base58::encode_base58_checksum;
 
 use super::{secp256k1_params::Secp256k1Params, signature::Signature};
 
@@ -74,6 +75,29 @@ impl PrivateKey {
 
         BigUint::from_bytes_be(&k)
     }
+
+    /// Returns the WIF (Wallet Import Format) for the private key.
+    pub fn to_wif(&self, compressed: bool, testnet: bool) -> String {
+        // create a fixed size array of 32 bytes
+        let mut bytes = self.secret.to_bytes_be();
+        bytes.reverse();
+        bytes.resize(32, 0);
+        bytes.reverse();
+
+        // add the prefix
+        let prefix = if testnet { 0xef } else { 0x80 };
+
+        // concatenate the prefix, secret, and suffix
+        let mut wif = vec![prefix];
+        wif.extend(bytes);
+        if compressed {
+            // add the suffix
+            wif.push(0x01);
+        }
+
+        // encode the result in base58
+        encode_base58_checksum(&wif)
+    }
 }
 
 #[cfg(test)]
@@ -100,5 +124,27 @@ mod tests {
         let point = g * secret;
 
         assert!(point.verify(&z, &sig));
+    }
+
+    #[test]
+    fn test_wif_exercise_6() {
+        let pk = PrivateKey::new(&BigUint::from(5003_u32));
+
+        assert_eq!(
+            pk.to_wif(true, true),
+            "cMahea7zqjxrtgAbB7LSGbcQUr1uX1ojuat9jZodMN8rFTv2sfUK"
+        );
+        let pk = PrivateKey::new(&BigUint::from(2021_u32).pow(5));
+
+        assert_eq!(
+            pk.to_wif(false, true),
+            "91avARGdfge8E4tZfYLoxeJ5sGBdNJQH4kvjpWAxgzczjbCwxic"
+        );
+        let pk = PrivateKey::new(&BigUint::from(0x54321deadbeef_u64));
+
+        assert_eq!(
+            pk.to_wif(true, false),
+            "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgiuQJv1h8Ytr2S53a"
+        );
     }
 }

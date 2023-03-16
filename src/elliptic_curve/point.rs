@@ -1,4 +1,6 @@
-use num::BigUint;
+use num::{BigUint, Integer};
+
+use crate::utils::{encode_base58::encode_base58_checksum, hash160::hash160};
 
 use super::{
     curve::EllipticCurve, element::FFElement, secp256k1_params::Secp256k1Params,
@@ -99,6 +101,24 @@ impl ECPoint {
         total.x.unwrap().num() == signature.r()
     }
 
+    /// Returns the address of the public key
+    pub fn get_address(&self, compressed: bool, testnet: bool) -> String {
+        let sec = if compressed {
+            self.to_compressed_sec()
+        } else {
+            self.to_uncompressed_sec()
+        };
+
+        let h160 = hash160(&sec);
+
+        let prefix = if testnet { b"\x6f" } else { b"\x00" };
+
+        let mut address = prefix.to_vec();
+        address.extend(h160);
+
+        encode_base58_checksum(&address)
+    }
+
     /// Returns true if the point is at infinity (additive identity)
     pub fn is_infinity(&self) -> bool {
         // The x coordinate and y coordinate being None is how we signify the point at infinity.
@@ -106,8 +126,83 @@ impl ECPoint {
     }
 
     /// Returns the x coordinate of the point
+    /// Note: This will panic if the point is at infinity
     pub(super) fn x(&self) -> Option<FFElement> {
         self.x.clone()
+    }
+
+    /// Returns the y coordinate of the point
+    /// Note: This will panic if the point is at infinity
+    pub(super) fn y(&self) -> Option<FFElement> {
+        self.y.clone()
+    }
+}
+
+impl ECPoint {
+    /// Uncompressed SEC format
+    pub fn to_uncompressed_sec(&self) -> Vec<u8> {
+        let mut sec = vec![4u8];
+        sec.extend(self.x().unwrap().num().to_bytes_be());
+        sec.extend(self.y().unwrap().num().to_bytes_be());
+        sec
+    }
+
+    /// Compressed SEC format
+    pub fn to_compressed_sec(&self) -> Vec<u8> {
+        let y_is_even = self.y().unwrap().num().is_even();
+        let mut sec = vec![if y_is_even { 2u8 } else { 3u8 }];
+        sec.extend(self.x().unwrap().num().to_bytes_be());
+        sec
+    }
+
+    /// Deserialize a point from SEC format
+    pub fn parse(sec_bin: &[u8]) -> Result<Self, String> {
+        // The uncompressed SEC format is pretty straightforward.
+        if sec_bin.len() == 65 {
+            if sec_bin[0] != 4 {
+                return Err("Invalid SEC format".to_string());
+            }
+
+            let x = BigUint::from_bytes_be(&sec_bin[1..33]);
+            let y = BigUint::from_bytes_be(&sec_bin[33..65]);
+            return Self::new_secp256k1(
+                &FFElement::new_secp256k1(&x),
+                &FFElement::new_secp256k1(&y),
+            );
+        }
+
+        if sec_bin.len() == 33 {
+            // The evenness of the y coordinate is given in the first byte.
+            let is_even = sec_bin[0] == 2;
+            let x = BigUint::from_bytes_be(&sec_bin[1..]);
+            let x = FFElement::new_secp256k1(&x);
+
+            // right side of the equation y^2 = x^3 + 7
+            let alpha = x.pow(3) + FFElement::new_secp256k1(&Secp256k1Params::b());
+
+            // solve for left side
+            let beta = alpha.sqrt();
+
+            let even_beta = if beta.num().is_even() {
+                beta.clone()
+            } else {
+                FFElement::new_secp256k1(&(Secp256k1Params::p() - beta.clone().num()))
+            };
+
+            let odd_beta = if beta.num().is_even() {
+                FFElement::new_secp256k1(&(Secp256k1Params::p() - beta.num()))
+            } else {
+                beta
+            };
+
+            if is_even {
+                return Self::new_secp256k1(&x, &even_beta);
+            } else {
+                return Self::new_secp256k1(&x, &odd_beta);
+            }
+        }
+
+        Err("Invalid SEC format".to_string())
     }
 }
 
@@ -459,5 +554,124 @@ mod tests {
         .unwrap();
 
         assert!(point.verify(&z, &Signature::new(&r, &s)));
+    }
+
+    #[test]
+    fn test_uncompressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5000u32);
+        assert_eq!(
+            point.to_uncompressed_sec(),
+            hex::decode(
+                "04\
+                ffe558e388852f0120e46af2d1b370f85854a8eb0841811ece0e3e03d282d57c315dc72890a4\
+                f10a1481c031b03b351b0dc79901ca18a00cf009dbdb157a1d10"
+            )
+            .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from(2018_u32).pow(5);
+        assert_eq!(
+            point.to_uncompressed_sec(),
+            hex::decode(
+                "04\
+                027f3da1918455e03c46f659266a1bb5204e959db7364d2f473bdf8f0a13cc9dff87647fd023\
+                c13b4a4994f17691895806e1b40b57f4fd22581a4f46851f3b06"
+            )
+            .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef12345", 16).unwrap();
+        assert_eq!(
+            point.to_uncompressed_sec(),
+            hex::decode(
+                "04\
+                d90cd625ee87dd38656dd95cf79f65f60f7273b67d3096e68bd81e4f5342691f842efa762fd5\
+                9961d0e99803c61edba8b3e3f7dc3a341836f97733aebf987121"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_compressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5001u32);
+        assert_eq!(
+            point.to_compressed_sec(),
+            hex::decode("0357a4f368868a8a6d572991e484e664810ff14c05c0fa023275251151fe0e53d1")
+                .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from(2019_u32).pow(5);
+        assert_eq!(
+            point.to_compressed_sec(),
+            hex::decode("02933ec2d2b111b92737ec12f1c5d20f3233a0ad21cd8b36d0bca7a0cfa5cb8701")
+                .unwrap()
+        );
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef54321", 16).unwrap();
+        assert_eq!(
+            point.to_compressed_sec(),
+            hex::decode("0296be5b1292f6c856b3c5654e886fc13511462059089cdf9c479623bfcbe77690")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_parse_uncompressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5000u32);
+        assert_eq!(ECPoint::parse(&point.to_uncompressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from(2018_u32).pow(5);
+        assert_eq!(ECPoint::parse(&point.to_uncompressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef12345", 16).unwrap();
+        assert_eq!(ECPoint::parse(&point.to_uncompressed_sec()).unwrap(), point);
+    }
+
+    #[test]
+    fn test_parse_compressed_sec() {
+        let point = Secp256k1Params::g() * BigUint::from(5001u32);
+        assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from(2019_u32).pow(5);
+        assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("deadbeef54321", 16).unwrap();
+        assert_eq!(ECPoint::parse(&point.to_compressed_sec()).unwrap(), point);
+    }
+
+    #[test]
+    fn test_address_exercise_5() {
+        let point = Secp256k1Params::g() * BigUint::from(5002u32);
+
+        assert_eq!(
+            point.get_address(false, true),
+            "mmTPbXQFxboEtNRkwfh6K51jvdtHLxGeMA"
+        );
+
+        let point = Secp256k1Params::g() * BigUint::from(2020_u32).pow(5);
+        assert_eq!(
+            point.get_address(true, true),
+            "mopVkxp8UhXqRYbCYJsbeE1h1fiF64jcoH"
+        );
+        let point = Secp256k1Params::g() * BigUint::from_str_radix("12345deadbeef", 16).unwrap();
+        assert_eq!(
+            point.get_address(true, false),
+            "1F1Pn2y6pDb68E5nYJJeba4TLg2U7B6KF1"
+        );
+    }
+
+    #[test]
+    fn test_address() {
+        let secret1 = 888_u32.pow(3);
+        let secret2 = 321_u32;
+        let secret3 = 4242424242_u32;
+
+        let values = vec![
+            // secret, compressed, testnet, address
+            (secret1, true, false, "148dY81A9BmdpMhvYEVznrM45kWN32vSCN"),
+            (secret1, true, true, "mieaqB68xDCtbUBYFoUNcmZNwk74xcBfTP"),
+            (secret2, false, false, "1S6g2xBJSED7Qr9CYZib5f4PYVhHZiVfj"),
+            (secret2, false, true, "mfx3y63A7TfTtXKkv7Y6QzsPFY6QCBCXiP"),
+            (secret3, false, false, "1226JSptcStqn4Yq9aAmNXdwdc2ixuH9nb"),
+            (secret3, false, true, "mgY3bVusRUL6ZB2Ss999CSrGVbdRwVpM8s"),
+        ];
+
+        for (secret, compressed, testnet, address) in values {
+            let point = Secp256k1Params::g() * BigUint::from(secret);
+            assert_eq!(point.get_address(compressed, testnet), address);
+        }
     }
 }
