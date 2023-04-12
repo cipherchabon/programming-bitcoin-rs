@@ -362,7 +362,7 @@ impl std::fmt::Display for ECPoint {
 mod tests {
     use num::{BigUint, Num};
 
-    use crate::elliptic_curve::finite_field::FiniteField;
+    use crate::ecc::finite_field::FiniteField;
 
     use super::*;
 
