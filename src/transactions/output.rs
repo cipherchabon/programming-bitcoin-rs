@@ -25,9 +25,14 @@ impl TxOutput {
 
     /// Serializes the transaction output into a byte vector
     pub fn serialize(&self) -> Vec<u8> {
-        let mut result = vec![];
-        result.extend(&self.amount.to_le_bytes());
+        let mut result = Vec::new();
+
+        // Serialize amount, 8 bytes, little endian
+        result.extend_from_slice(&self.amount.to_le_bytes());
+
+        // Serialize the script_pubkey
         result.extend(self.script_pubkey.serialize());
+
         result
     }
 

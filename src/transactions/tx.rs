@@ -3,7 +3,10 @@ use std::{
     io::{Cursor, Read},
 };
 
-use crate::utils::varint::read_varint;
+use crate::utils::{
+    hash256::hash256,
+    varint::{encode_varint, read_varint},
+};
 
 use super::{input::TxInput, output::TxOutput};
 
@@ -38,29 +41,56 @@ impl Tx {
 
         let mut locktime = vec![0; 4];
         stream.read_exact(&mut locktime).unwrap();
+        let locktime = u32::from_le_bytes(locktime.try_into().unwrap());
 
         Ok(Tx {
             version,
             inputs,
             outputs,
-            locktime: u32::from_le_bytes(locktime.try_into().unwrap()),
+            locktime,
         })
     }
 
     /// Returns the byte serialization of the transaction
     pub fn serialize(&self) -> Vec<u8> {
-        let mut result = vec![];
-        result.extend(self.version.to_le_bytes().to_vec());
-        result.extend(self.inputs.len().to_le_bytes().to_vec());
-        for input in self.inputs.iter() {
+        let mut result = Vec::new();
+
+        // Serialize version in little endian
+        let version_le = self.version.to_le_bytes().to_vec();
+        result.extend(version_le);
+
+        // Serialize inputs
+        let inputs = self.inputs.clone();
+        result.extend_from_slice(&encode_varint(inputs.len() as u64).unwrap());
+
+        for input in inputs {
             result.extend(input.serialize());
         }
-        result.extend(self.outputs.len().to_le_bytes().to_vec());
-        for output in self.outputs.iter() {
+
+        // Serialize outputs
+        let outputs = self.outputs.clone();
+        result.extend_from_slice(&encode_varint(outputs.len() as u64).unwrap());
+        for output in outputs {
             result.extend(output.serialize());
         }
-        result.extend(self.locktime.to_le_bytes().to_vec());
+
+        // Serialize locktime in little endian
+        let locktime_le = self.locktime.to_le_bytes().to_vec();
+        result.extend(locktime_le);
+
         result
+    }
+
+    /// Returns the transaction id
+    pub fn id(&self) -> String {
+        hex::encode(self.hash())
+    }
+
+    fn hash(&self) -> Vec<u8> {
+        let bytes = self.serialize();
+        let mut hash = hash256(&bytes);
+        hash.reverse();
+        hash.to_vec()
     }
 
     pub fn get_version(&self) -> u32 {

@@ -34,13 +34,22 @@ impl TxInput {
 
     /// Returns the byte serialization of the transaction input
     pub fn serialize(&self) -> Vec<u8> {
-        let mut result = vec![];
-        let mut prev_tx = self.prev_tx.clone();
-        prev_tx.reverse();
-        result.extend(prev_tx);
-        result.extend(self.prev_index.clone());
+        let mut result = Vec::new();
+
+        // Serialize prev_tx (no need to reverse)
+        result.extend(&self.prev_tx);
+
+        // Serialize prev_index in little endian
+        let prev_index_le = self.prev_index.clone();
+        result.extend(prev_index_le);
+
+        // Serialize script_sig
         result.extend(self.script_sig.serialize());
-        result.extend(self.sequence.clone());
+
+        // Serialize sequence in little endian
+        let sequence = self.sequence.clone();
+        result.extend(sequence);
+
         result
     }
 
