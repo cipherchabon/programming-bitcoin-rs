@@ -29,7 +29,7 @@ pub fn encode_base58(bytes: &[u8]) -> String {
         );
     }
     for _ in 0..leading_zeros {
-        result.push(BASE58_ALPHABET.chars().nth(0).unwrap());
+        result.push(BASE58_ALPHABET.chars().next().unwrap());
     }
     result.chars().rev().collect()
 }

@@ -42,24 +42,24 @@ pub fn encode_varint(i: u64) -> Result<Vec<u8>, std::io::Error> {
         // If the number is below 253, encode that number as a single byte (e.g.,
         // 100 → 0x64).
         buffer.write_all(&[i as u8])?;
-    } else if i >= 0xfd && i <= 0xffff {
+    } else if (0xfd..=0xffff).contains(&i) {
         // If the number is between 253 and 2^16 – 1, start with the 253 byte (fd)
         // and then encode the number in 2 bytes in little-endian (e.g., 255 →
         // 0xfdff00, 555 → 0xfd2b02).
         buffer.write_all(&[0xfd])?;
         buffer.write_all(&(i as u16).to_le_bytes())?;
-    } else if i >= 0x10000 && i <= 0xffffffff {
+    } else if (0x10000..=0xffffffff).contains(&i) {
         // If the number is between 2^16 and 2^32 – 1, start with the 254 byte (fe)
         // and then encode the number in 4 bytes in little-endian (e.g., 70015 →
         // 0xfe7f110100).
         buffer.write_all(&[0xfe])?;
         buffer.write_all(&(i as u32).to_le_bytes())?;
-    } else if i >= 0x100000000 && i <= (u64::MAX - 1) {
+    } else if (0x100000000..=(u64::MAX - 1)).contains(&i) {
         // If the number is between 2^32 and 2^64 – 1, start with the 255 byte (ff)
         // and then encode the number in 8 bytes in little-endian (e.g.,
         // 18005558675309 → 0xff6dc7ed3e60100000)
         buffer.write_all(&[0xff])?;
-        buffer.write_all(&(i as u64).to_le_bytes())?;
+        buffer.write_all(&i.to_le_bytes())?;
     } else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,

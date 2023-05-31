@@ -3,7 +3,7 @@ use std::{
     io::{Cursor, Error, Read},
 };
 
-use crate::script::script::Script;
+use crate::script::Script;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TxInput {

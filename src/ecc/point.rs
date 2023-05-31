@@ -85,7 +85,7 @@ impl ECPoint {
         let n = &Secp256k1Params::n();
         let s = signature.s();
         let two = &BigUint::from(2u8);
-        let s_inv = s.modpow(&(n - two), &n);
+        let s_inv = s.modpow(&(n - two), n);
 
         // u = z / s
         let u = z * &s_inv % n;
@@ -186,7 +186,7 @@ impl ECPoint {
             let even_beta = if beta.num().is_even() {
                 beta.clone()
             } else {
-                FFElement::new_secp256k1(&(Secp256k1Params::p() - beta.clone().num()))
+                FFElement::new_secp256k1(&(Secp256k1Params::p() - beta.num()))
             };
 
             let odd_beta = if beta.num().is_even() {

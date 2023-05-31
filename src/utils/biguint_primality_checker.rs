@@ -43,7 +43,7 @@ pub(crate) fn biguint_primality_checker(n: &BigUint) -> bool {
         // Generate random number a in range [2, n-2]
         let a = loop {
             let rand = rng.gen_biguint_range(&two, &(n - &two));
-            if &rand >= &two {
+            if rand >= two {
                 break rand;
             }
         };

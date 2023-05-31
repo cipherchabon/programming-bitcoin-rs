@@ -15,7 +15,7 @@ impl FiniteField {
     /// Arguments:
     /// * `order`: the order of the field must be a prime number.
     pub fn new(order: &BigUint) -> Self {
-        if !biguint_primality_checker(&order) {
+        if !biguint_primality_checker(order) {
             panic!("The order of the field must be a prime number");
         }
         Self {
@@ -49,8 +49,8 @@ mod tests {
     #[test]
     fn test_new() {
         let two = BigUint::from_u32(2).unwrap();
-        let field = FiniteField::new(&two.clone());
-        assert_eq!(field.order, two.clone());
+        let field = FiniteField::new(&two);
+        assert_eq!(field.order, two);
     }
 
     #[test]
@@ -74,8 +74,8 @@ mod tests {
     #[test]
     fn test_eq() {
         let two = BigUint::from_u32(2).unwrap();
-        let field1 = FiniteField::new(&two.clone());
-        let field2 = FiniteField::new(&two.clone());
+        let field1 = FiniteField::new(&two);
+        let field2 = FiniteField::new(&two);
         assert_eq!(field1, field2);
     }
 

@@ -1,9 +1,9 @@
 use std::{
     fmt,
-    io::{Cursor, Read},
+    io::{Cursor, Error, Read},
 };
 
-use crate::script::script::Script;
+use crate::script::Script;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TxOutput {
@@ -13,7 +13,7 @@ pub struct TxOutput {
 
 impl TxOutput {
     /// Parses a transaction output from a byte vector
-    pub fn parse(cursor: &mut Cursor<Vec<u8>>) -> Result<Self, std::io::Error> {
+    pub fn parse(cursor: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
         let mut value = [0; 8];
         cursor.read_exact(&mut value)?;
         let script_pubkey = Script::parse(cursor)?;

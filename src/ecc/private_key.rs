@@ -52,7 +52,7 @@ impl PrivateKey {
             s = n - s;
         }
 
-        Signature::new(&r, &s)
+        Signature::new(r, &s)
     }
 
     // see https://docs.rs/rfc6979/0.4.0/rfc6979/
@@ -69,9 +69,9 @@ impl PrivateKey {
         let mut z = GenericArray::<u8, U32>::default();
         z.copy_from_slice(&z_bytes);
 
-        let h = Sha256::digest(&z);
+        let h = Sha256::digest(z);
 
-        let k = rfc6979::generate_k::<Sha256, U32>(&k.into(), &p.into(), &h, b"");
+        let k = rfc6979::generate_k::<Sha256, U32>(&k, &p, &h, b"");
 
         BigUint::from_bytes_be(&k)
     }

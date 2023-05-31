@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    io::{Cursor, Read},
+    io::{Cursor, Error, ErrorKind, Read},
 };
 
 use crate::utils::{
@@ -15,33 +15,58 @@ pub struct Tx {
     version: u32,
     inputs: Vec<TxInput>,
     outputs: Vec<TxOutput>,
-    locktime: u32,
+    locktime: Locktime,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Locktime {
+    BlockHeight(u32),
+    UnixTimestamp(u32),
 }
 
 impl Tx {
     /// Parses a transaction from a byte stream
-    pub fn parse(stream: &mut Cursor<Vec<u8>>) -> Result<Self, std::io::Error> {
+    pub fn parse(stream: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
         let mut version = vec![0; 4];
-        stream.read_exact(&mut version).unwrap();
-        let version = u32::from_le_bytes(version.try_into().unwrap());
+
+        stream
+            .read_exact(&mut version)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Invalid version: {}", e)))?;
+
+        let version = u32::from_le_bytes(
+            version
+                .try_into()
+                .map_err(|_| Error::new(ErrorKind::Other, "Invalid version"))?,
+        );
 
         let mut inputs = vec![];
         if let Ok(num_inputs) = read_varint(stream) {
             for _ in 0..num_inputs {
-                inputs.push(TxInput::parse(stream).unwrap());
+                let input = TxInput::parse(stream)
+                    .map_err(|_| Error::new(ErrorKind::Other, "Invalid input"))?;
+                inputs.push(input);
             }
         }
 
         let mut outputs = vec![];
         if let Ok(num_outputs) = read_varint(stream) {
             for _ in 0..num_outputs {
-                outputs.push(TxOutput::parse(stream).unwrap());
+                let output = TxOutput::parse(stream)
+                    .map_err(|_| Error::new(ErrorKind::Other, "Invalid output"))?;
+
+                outputs.push(output);
             }
         }
 
-        let mut locktime = vec![0; 4];
-        stream.read_exact(&mut locktime).unwrap();
-        let locktime = u32::from_le_bytes(locktime.try_into().unwrap());
+        let mut locktime_bytes = vec![0; 4];
+        stream.read_exact(&mut locktime_bytes).unwrap();
+        let locktime_value = u32::from_le_bytes(locktime_bytes.try_into().unwrap());
+
+        let locktime = if locktime_value >= 500_000_000 {
+            Locktime::UnixTimestamp(locktime_value)
+        } else {
+            Locktime::BlockHeight(locktime_value)
+        };
 
         Ok(Tx {
             version,
@@ -75,7 +100,10 @@ impl Tx {
         }
 
         // Serialize locktime in little endian
-        let locktime_le = self.locktime.to_le_bytes().to_vec();
+        let locktime_le = match self.locktime {
+            Locktime::BlockHeight(value) => value.to_le_bytes().to_vec(),
+            Locktime::UnixTimestamp(value) => value.to_le_bytes().to_vec(),
+        };
         result.extend(locktime_le);
 
         result
@@ -105,8 +133,8 @@ impl Tx {
         self.outputs.clone()
     }
 
-    pub fn get_locktime(&self) -> u32 {
-        self.locktime
+    pub fn get_locktime(&self) -> Locktime {
+        self.locktime.clone()
     }
 }
 
@@ -118,7 +146,10 @@ impl fmt::Display for Tx {
             self.version,
             self.inputs.len(),
             self.outputs.len(),
-            self.locktime
+            match self.locktime {
+                Locktime::BlockHeight(value) => format!("BlockHeight({})", value),
+                Locktime::UnixTimestamp(value) => format!("UnixTimestamp({})", value),
+            }
         )
     }
 }
@@ -177,6 +208,6 @@ mod tests {
         let raw_tx = hex::decode("0100000001813f79011acb80925dfe69b3def355fe914bd1d96a3f5f71bf8303c6a989c7d1000000006b483045022100ed81ff192e75a3fd2304004dcadb746fa5e24c5031ccfcf21320b0277457c98f02207a986d955c6e0cb35d446a89d3f56100f4d7f67801c31967743a9c8e10615bed01210349fc4e631e3624a545de3f89f5d8684c7b8138bd94bdd531d2e213bf016b278afeffffff02a135ef01000000001976a914bc3b654dca7e56b04dca18f2566cdaf02e8d9ada88ac99c39800000000001976a9141c4bc762dd5423e332166702cb75f40df79fea1288ac19430600").unwrap();
         let mut stream = Cursor::new(raw_tx);
         let tx = Tx::parse(&mut stream).unwrap();
-        assert_eq!(tx.get_locktime(), 410393);
+        assert_eq!(tx.get_locktime(), Locktime::BlockHeight(410393));
     }
 }

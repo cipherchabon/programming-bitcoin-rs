@@ -140,12 +140,13 @@ fn op_16(stack: &mut Vec<Vec<u8>>) -> bool {
     true
 }
 
+#[allow(clippy::ptr_arg)]
 fn op_nop(_stack: &mut Vec<Vec<u8>>) -> bool {
     true
 }
 
 fn op_if(stack: &mut Vec<Vec<u8>>, items: &mut Vec<u8>) -> bool {
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
 
@@ -195,7 +196,7 @@ fn op_if(stack: &mut Vec<Vec<u8>>, items: &mut Vec<u8>) -> bool {
 }
 
 fn op_notif(stack: &mut Vec<Vec<u8>>, items: &mut Vec<u8>) -> bool {
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
 
@@ -245,7 +246,7 @@ fn op_notif(stack: &mut Vec<Vec<u8>>, items: &mut Vec<u8>) -> bool {
 }
 
 fn op_verify(stack: &mut Vec<Vec<u8>>) -> bool {
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
 
@@ -257,8 +258,9 @@ fn op_verify(stack: &mut Vec<Vec<u8>>) -> bool {
     true
 }
 
+#[allow(clippy::ptr_arg)]
 fn op_return(_stack: &mut Vec<Vec<u8>>) -> bool {
-    return false;
+    false
 }
 
 fn op_toaltstack(stack: &mut Vec<Vec<u8>>, altstack: &mut Vec<Vec<u8>>) -> bool {
@@ -358,7 +360,7 @@ fn op_2swap(stack: &mut Vec<Vec<u8>>) -> bool {
 }
 
 fn op_ifdup(stack: &mut Vec<Vec<u8>>) -> bool {
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
     let item = stack[stack.len() - 1].clone();
@@ -409,7 +411,7 @@ fn op_over(stack: &mut Vec<Vec<u8>>) -> bool {
 }
 
 fn op_pick(stack: &mut Vec<Vec<u8>>) -> bool {
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
     let item = stack.pop().unwrap();
@@ -423,7 +425,7 @@ fn op_pick(stack: &mut Vec<Vec<u8>>) -> bool {
 }
 
 fn op_roll(stack: &mut Vec<Vec<u8>>) -> bool {
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
     let item = stack.pop().unwrap();
@@ -757,7 +759,7 @@ fn op_ripemd160(stack: &mut Vec<Vec<u8>>) -> bool {
         return false;
     }
     let item = stack.pop().unwrap();
-    let hash = Ripemd160::digest(&item);
+    let hash = Ripemd160::digest(item);
     stack.push(hash.to_vec());
     true
 }
@@ -795,7 +797,7 @@ fn op_hash160(stack: &mut Vec<Vec<u8>>) -> bool {
     hasher.update(&element);
     let result = hasher.finalize();
     let mut hasher = Ripemd160::new();
-    hasher.update(&result);
+    hasher.update(result);
     let result = hasher.finalize();
     stack.push(result.to_vec());
     true
@@ -810,12 +812,13 @@ fn op_hash256(stack: &mut Vec<Vec<u8>>) -> bool {
     hasher.update(&element);
     let result = hasher.finalize();
     let mut hasher = Sha256::new();
-    hasher.update(&result);
+    hasher.update(result);
     let result = hasher.finalize();
     stack.push(result.to_vec());
     true
 }
 
+#[allow(clippy::ptr_arg)]
 fn op_checksig(_stack: &mut Vec<Vec<u8>>, _z: i64) -> bool {
     unimplemented!()
 }
@@ -824,6 +827,7 @@ fn op_checksigverify(stack: &mut Vec<Vec<u8>>, z: i64) -> bool {
     op_checksig(stack, z) && op_verify(stack)
 }
 
+#[allow(clippy::ptr_arg)]
 fn op_checkmultisig(_stack: &mut Vec<Vec<u8>>, _z: i64) -> bool {
     unimplemented!()
 }
@@ -836,7 +840,7 @@ fn op_checklocktimeverify(stack: &mut Vec<Vec<u8>>, locktime: u32, sequence: u32
     if sequence == 0xffffffff {
         return false;
     }
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
     let element = decode_num(stack.last().unwrap());
@@ -856,23 +860,21 @@ fn op_checksequenceverify(stack: &mut Vec<Vec<u8>>, version: u32, sequence: u32)
     if sequence & (1 << 31) == (1 << 31) {
         return false;
     }
-    if stack.len() < 1 {
+    if stack.is_empty() {
         return false;
     }
     let element = decode_num(stack.last().unwrap());
     if element < 0 {
         return false;
     }
-    if element as u32 & (1 << 31) == (1 << 31) {
-        if version < 2 {
-            return false;
-        } else if sequence & (1 << 31) == (1 << 31) {
-            return false;
-        } else if element as u32 & (1 << 22) != sequence & (1 << 22) {
-            return false;
-        } else if element as u32 & 0xffff > sequence & 0xffff {
-            return false;
-        }
+
+    if element as u32 & (1 << 31) == (1 << 31)
+        && (version < 2
+            || sequence & (1 << 31) == (1 << 31)
+            || element as u32 & (1 << 22) != sequence & (1 << 22)
+            || element as u32 & 0xffff > sequence & 0xffff)
+    {
+        return false;
     }
     true
 }
@@ -964,10 +966,12 @@ pub fn create_op_code_functions() -> HashMap<u8, OpFunction> {
     op_code_functions
 }
 
+type StackOpFunc = fn(&mut Vec<Vec<u8>>, &mut Vec<Vec<u8>>) -> bool;
+
 pub enum OpFunction {
     StackOp(fn(&mut Vec<Vec<u8>>) -> bool),
     StackItemsOp(fn(&mut Vec<Vec<u8>>, &mut Vec<u8>) -> bool),
-    StackAltStackOp(fn(&mut Vec<Vec<u8>>, &mut Vec<Vec<u8>>) -> bool),
+    StackAltStackOp(StackOpFunc),
     StackHashOp(fn(&mut Vec<Vec<u8>>) -> bool),
     StackLocktimeSequenceOp(fn(&mut Vec<Vec<u8>>, u32, u32) -> bool),
     StackSigOp(fn(&mut Vec<Vec<u8>>, i64) -> bool),

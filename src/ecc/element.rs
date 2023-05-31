@@ -31,14 +31,14 @@ impl FFElement {
     pub fn pow(&self, exponent: u32) -> Self {
         let p = self.field.order();
         let exp = BigUint::from(exponent);
-        let num = self.num.modpow(&exp, &p);
+        let num = self.num.modpow(&exp, p);
         Self::new(&num, &self.field)
     }
 
     pub fn sqrt(&self) -> Self {
         let p = self.field.order();
         let exp = (p + BigUint::from(1u32)) / BigUint::from(4u32);
-        let num = self.num.modpow(&exp, &p);
+        let num = self.num.modpow(&exp, p);
         Self::new(&num, &self.field)
     }
 
@@ -132,7 +132,7 @@ impl std::ops::Div for FFElement {
 
         // b^-1
         let two = BigUint::from(2u32);
-        let b_inv = b.modpow(&(p - two), &p);
+        let b_inv = b.modpow(&(p - two), p);
 
         Self::new(&((a * b_inv) % p), &self.field)
     }
@@ -147,8 +147,8 @@ mod tests {
         let field = FiniteField::new(&BigUint::from(13u32));
         let a = FFElement::new(&BigUint::from(7u32), &field);
         let b = FFElement::new(&BigUint::from(6u32), &field);
-        assert_eq!(a == b, false);
-        assert_eq!(a == a, true);
+        assert!(a != b);
+        assert!(a == a);
     }
 
     #[test]
@@ -156,8 +156,8 @@ mod tests {
         let field = FiniteField::new(&BigUint::from(13u32));
         let a = FFElement::new(&BigUint::from(7u32), &field);
         let b = FFElement::new(&BigUint::from(6u32), &field);
-        assert_eq!(a != b, true);
-        assert_eq!(a != a, false);
+        assert!(a != b);
+        assert!(a == a);
     }
 
     #[test]
@@ -173,11 +173,11 @@ mod tests {
         let a = FFElement::new(&BigUint::from(2u32), &field);
         let b = FFElement::new(&BigUint::from(15u32), &field);
         let c = FFElement::new(&BigUint::from(17u32), &field);
-        assert_eq!(a + b == c, true);
+        assert!(a + b == c);
         let a = FFElement::new(&BigUint::from(17u32), &field);
         let b = FFElement::new(&BigUint::from(21u32), &field);
         let c = FFElement::new(&BigUint::from(7u32), &field);
-        assert_eq!(a + b == c, true);
+        assert!(a + b == c);
     }
 
     #[test]
@@ -186,11 +186,11 @@ mod tests {
         let a = FFElement::new(&BigUint::from(29u32), &field);
         let b = FFElement::new(&BigUint::from(4u32), &field);
         let c = FFElement::new(&BigUint::from(25u32), &field);
-        assert_eq!(a - b == c, true);
+        assert!(a - b == c);
         let a = FFElement::new(&BigUint::from(15u32), &field);
         let b = FFElement::new(&BigUint::from(30u32), &field);
         let c = FFElement::new(&BigUint::from(16u32), &field);
-        assert_eq!(a - b == c, true);
+        assert!(a - b == c);
     }
 
     #[test]
@@ -199,7 +199,7 @@ mod tests {
         let a = FFElement::new(&BigUint::from(24u32), &field);
         let b = FFElement::new(&BigUint::from(19u32), &field);
         let c = FFElement::new(&BigUint::from(22u32), &field);
-        assert_eq!(a * b == c, true);
+        assert!(a * b == c);
     }
 
     #[test]
@@ -208,7 +208,7 @@ mod tests {
         let a = FFElement::new(&BigUint::from(24u32), &field);
         let b = FFElement::new(&BigUint::from(19u32), &field);
         let c = FFElement::new(&BigUint::from(22u32), &field);
-        assert_eq!(b * a == c, true);
+        assert!(b * a == c);
     }
 
     #[test]
@@ -217,14 +217,8 @@ mod tests {
         let a = FFElement::new(&BigUint::from(17u32), &field);
         let b = FFElement::new(&BigUint::from(5u32), &field);
         let c = FFElement::new(&BigUint::from(18u32), &field);
-        assert_eq!(
-            a.pow(3) == FFElement::new(&BigUint::from(15u32), &field),
-            true
-        );
-        assert_eq!(
-            b.pow(5) * c == FFElement::new(&BigUint::from(16u32), &field),
-            true
-        );
+        assert!(a.pow(3) == FFElement::new(&BigUint::from(15u32), &field));
+        assert!(b.pow(5) * c == FFElement::new(&BigUint::from(16u32), &field));
     }
 
     #[test]
@@ -232,6 +226,6 @@ mod tests {
         let field = FiniteField::new(&BigUint::from(31u32));
         let a = FFElement::new(&BigUint::from(3u32), &field);
         let b = FFElement::new(&BigUint::from(24u32), &field);
-        assert_eq!(a / b == FFElement::new(&BigUint::from(4u32), &field), true);
+        assert!(a / b == FFElement::new(&BigUint::from(4u32), &field));
     }
 }

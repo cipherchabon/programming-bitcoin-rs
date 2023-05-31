@@ -24,7 +24,7 @@ impl TxFetcher {
         let mut cache = self.cache.borrow_mut();
         if fresh || !cache.contains_key(tx_id) {
             let url = format!("{}/tx/{}/hex", self.api_url, tx_id);
-            let response = reqwest::blocking::get(&url)?.text()?;
+            let response = reqwest::blocking::get(url)?.text()?;
             let raw = hex::decode(response.trim())?;
             let mut cursor = Cursor::new(raw);
             let tx = Tx::parse(&mut cursor)?;
@@ -80,6 +80,12 @@ impl TxFetcher {
 /// Builder for TxFetcher
 pub struct TxFetcherBuilder {
     api_url: String,
+}
+
+impl Default for TxFetcherBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TxFetcherBuilder {
